@@ -1,9 +1,17 @@
 import { useRef, useEffect, useState, Suspense } from 'react'
-import { useTexture } from '@react-three/drei'
-import { SpotLight, Object3D } from 'three'
+import { useFrame, useThree } from '@react-three/fiber'
+import { useTexture, Text } from '@react-three/drei'
+import { SpotLight, Object3D, Vector3, Group } from 'three'
 import type { ThreeEvent } from '@react-three/fiber'
 import type { PaintingData } from '../data/paintings'
 import { useMuseum } from '../stores/useMuseum'
+import {
+  setApproachIntensity,
+  APPROACH_INNER,
+  APPROACH_OUTER,
+  APPROACH_SCALE_MAX,
+  APPROACH_LERP_SPEED,
+} from '../lib/approachState'
 
 interface PaintingProps {
   data: PaintingData
@@ -11,10 +19,13 @@ interface PaintingProps {
 
 type LoadState = 'checking' | 'ready' | 'failed'
 
+// Reusable vector to avoid per-frame allocation
+const _paintingPos = new Vector3()
+
 function handleClick(data: PaintingData) {
   return (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
-    useMuseum.getState().setActivePainting(data.id)
+    useMuseum.getState().setDeepZoomPainting(data.id)
   }
 }
 
@@ -62,8 +73,13 @@ function PaintingCanvas({ data }: PaintingProps) {
 }
 
 export default function Painting({ data }: PaintingProps) {
+  const groupRef = useRef<Group>(null)
   const lightRef = useRef<SpotLight>(null)
   const targetRef = useRef<Object3D>(null)
+  const { camera } = useThree()
+
+  // Smooth approach intensity (lerped per frame, not React state)
+  const approachRef = useRef(0)
 
   useEffect(() => {
     if (lightRef.current && targetRef.current) {
@@ -72,8 +88,49 @@ export default function Painting({ data }: PaintingProps) {
     }
   }, [])
 
+  // Cleanup approach state on unmount
+  useEffect(() => {
+    return () => setApproachIntensity(data.id, 0)
+  }, [data.id])
+
+  useFrame(() => {
+    const group = groupRef.current
+    if (!group) return
+
+    // Calculate distance from camera to painting center
+    _paintingPos.set(data.position[0], data.position[1], data.position[2])
+    const dist = camera.position.distanceTo(_paintingPos)
+
+    // Only activate when player is on the viewing side (in front, not behind wall)
+    const nx = Math.sin(data.rotation[1])
+    const nz = Math.cos(data.rotation[1])
+    const toPlayerX = camera.position.x - data.position[0]
+    const toPlayerZ = camera.position.z - data.position[2]
+    const onFrontSide = toPlayerX * nx + toPlayerZ * nz > 0
+
+    // Target approach intensity based on distance zones + facing
+    let target = 0
+    if (onFrontSide) {
+      if (dist <= APPROACH_INNER) {
+        target = 1
+      } else if (dist < APPROACH_OUTER) {
+        target = (APPROACH_OUTER - dist) / (APPROACH_OUTER - APPROACH_INNER)
+      }
+    }
+
+    // Smooth lerp toward target
+    approachRef.current += (target - approachRef.current) * APPROACH_LERP_SPEED
+
+    // Apply scale: 1.0 → APPROACH_SCALE_MAX based on intensity
+    const scale = 1 + (APPROACH_SCALE_MAX - 1) * approachRef.current
+    group.scale.setScalar(scale)
+
+    // Write to shared approach state for ambient dimming
+    setApproachIntensity(data.id, approachRef.current)
+  })
+
   return (
-    <group position={data.position} rotation={data.rotation}>
+    <group ref={groupRef} position={data.position} rotation={data.rotation}>
       {/* Frame */}
       <mesh>
         <boxGeometry args={[data.size[0] + 0.1, data.size[1] + 0.1, 0.05]} />
@@ -82,6 +139,39 @@ export default function Painting({ data }: PaintingProps) {
 
       {/* Painting canvas — probes image, shows placeholder if missing */}
       <PaintingCanvas data={data} />
+
+      {/* ── Label plate below painting ── */}
+      <group position={[0, -(data.size[1] / 2 + 0.18), 0.03]}>
+        {/* Small plaque background */}
+        <mesh>
+          <planeGeometry args={[Math.min(data.size[0], 1.6), 0.22]} />
+          <meshStandardMaterial color="#1a1816" roughness={0.4} metalness={0.2} />
+        </mesh>
+        {/* Title */}
+        <Text
+          position={[0, 0.04, 0.005]}
+          fontSize={0.05}
+          color="#e8dcc0"
+          anchorX="center"
+          anchorY="middle"
+          maxWidth={Math.min(data.size[0], 1.5)}
+          textAlign="center"
+        >
+          {data.title}
+        </Text>
+        {/* Artist + year */}
+        <Text
+          position={[0, -0.05, 0.005]}
+          fontSize={0.035}
+          color="#a09880"
+          anchorX="center"
+          anchorY="middle"
+          maxWidth={Math.min(data.size[0], 1.5)}
+          textAlign="center"
+        >
+          {`${data.artist}, ${data.year}`}
+        </Text>
+      </group>
 
       {/* Spotlight target */}
       <object3D ref={targetRef} position={[0, 0, 0]} />
@@ -93,8 +183,6 @@ export default function Painting({ data }: PaintingProps) {
         angle={0.4}
         penumbra={0.8}
         intensity={50}
-        castShadow
-        shadow-mapSize={[512, 512]}
         color="#fff5e0"
       />
     </group>

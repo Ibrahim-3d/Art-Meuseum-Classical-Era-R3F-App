@@ -1,83 +1,238 @@
-import Room from './Room'
+import { useMemo } from 'react'
+import { SphereGeometry, DoubleSide } from 'three'
+import Room, { TEX } from './Room'
 import Painting from './Painting'
 import MusicStation from './MusicStation'
 import { Text } from '@react-three/drei'
 import { paintings } from '../data/paintings'
 import { music } from '../data/music'
+import {
+  Bench,
+  Column,
+  Pedestal,
+  GrandPiano,
+  OrganPipes,
+  Candelabra,
+  Chandelier,
+  Balustrade,
+  WindowFrame,
+  ArchFrame,
+  Sconce,
+  Urn,
+  Skylight,
+} from './Decorations'
 
 function musicFor(roomId: string) {
   return music.filter((m) => m.room === roomId)
 }
 
 /*
-  Layout — 3-column grid, all rooms connected via walkable doors:
+  MASTER LAYOUT — Rooms connect flush at shared boundaries
 
-  Left (x=-6, w=4)      Center (x=0, w=8)      Right (x=6, w=4)
-  X: -8 to -4           X: -4 to +4            X: +4 to +8
+  Wings (left):   center x=-13, w=12  → W=-19  E=-7
+  Center:         center x=0,   w=14  → W=-7   E=+7
+  Halls (right):  center x=+12, w=10  → W=+7   E=+17
 
-  Row 1 (z=0):    Wing A  ←→  Lobby    ←→  Hall 1
-  Row 2 (z=-10):  Wing B  ←→  Immersive ←→  Hall 2
-  Row 3 (z=-20):  Wing C  ←→  Atrium   ←→  Hall 3
-  Row 4 (z=-30):              Rooftop
+  Row 0 (z=  0):  Wing A   ←→  Lobby      ←→  Hall 1
+  Row 1 (z=-16):  Wing B   ←→  Immersive  ←→  Hall 2
+  Row 2 (z=-32):  Wing C   ←→  Atrium     ←→  Hall 3
+  Row 3 (z=-48):                Rooftop (16w)
 
-  Paintings/MusicStations use WORLD positions and render as siblings
-  of Room (not children), since Room wraps children in a positioned group.
-  Only room-local decorations (Text labels, lights) go as Room children.
+  Shared walls:
+    x=-7:  wings keep east wall (with door), center omits west
+    x=+7:  center keeps east wall (with door), halls omit west
+    z boundaries: upper row keeps north wall, lower row omits south
 */
+
+/** Create a dome (bottom half of a sphere) by clipping triangles above the equator. */
+function useDomeGeometry(radius: number, segments: number) {
+  return useMemo(() => {
+    const geo = new SphereGeometry(radius, segments, segments)
+    const pos = geo.getAttribute('position')
+    const idx = geo.getIndex()
+    if (!pos || !idx) return geo
+
+    // Keep only triangles whose ALL 3 vertices are at or above the equator (y >= -0.01)
+    // This is the TOP half — the dome that curves upward
+    const kept: number[] = []
+    for (let i = 0; i < idx.count; i += 3) {
+      const a = idx.getX(i)
+      const b = idx.getX(i + 1)
+      const c = idx.getX(i + 2)
+      if (pos.getY(a) >= -0.01 && pos.getY(b) >= -0.01 && pos.getY(c) >= -0.01) {
+        kept.push(a, b, c)
+      }
+    }
+    geo.setIndex(kept)
+    return geo
+  }, [radius, segments])
+}
+
+/** Dome mesh — renders the bottom half-sphere at a given Y position */
+function DomeMesh({ y, radius, segments, color, emissive }: {
+  y: number; radius: number; segments: number; color: string; emissive?: string
+}) {
+  const geo = useDomeGeometry(radius, segments)
+  return (
+    <mesh position={[0, y, 0]} geometry={geo}>
+      <meshStandardMaterial
+        color={color}
+        roughness={0.6}
+        side={DoubleSide}
+        emissive={emissive || '#000000'}
+        emissiveIntensity={emissive ? 0.3 : 0}
+      />
+    </mesh>
+  )
+}
+
+function DoorSign({ position, rotation = [0, 0, 0], text, subtitle }: {
+  position: [number, number, number]
+  rotation?: [number, number, number]
+  text: string
+  subtitle?: string
+}) {
+  return (
+    <group position={position} rotation={rotation}>
+      <mesh position={[0, 0, 0.02]}>
+        <boxGeometry args={[1.4, 0.35, 0.03]} />
+        <meshStandardMaterial color="#1a1816" roughness={0.4} metalness={0.2} />
+      </mesh>
+      <Text position={[0, 0.04, 0.06]} fontSize={0.09} color="#e8dcc0" anchorX="center" anchorY="middle">
+        {text}
+      </Text>
+      {subtitle && (
+        <Text position={[0, -0.08, 0.06]} fontSize={0.05} color="#a09880" anchorX="center" anchorY="middle">
+          {subtitle}
+        </Text>
+      )}
+    </group>
+  )
+}
 
 export default function Museum() {
   return (
     <group>
       {/* ════════════════════════════════════════════════════════════════════
-          LEFT COLUMN — Painting Wings
+          LEFT COLUMN — Painting Wings (12w × 16d × 6h, center x=-13)
           ════════════════════════════════════════════════════════════════════ */}
 
-      {/* Wing A: Renaissance */}
+      {/* ── Wing A: Renaissance ─────────────────────────────────────────── */}
       <Room
-        position={[-6, 0, 0]}
-        size={[4, 4, 10]}
+        position={[-13, 0, 0]}
+        size={[12, 6, 16]}
         wallColor="#e8e0d0"
-        floorColor="#2a2218"
+        floorColor="#c4a882"
         ceilingColor="#f5f0e8"
         wallRoughness={0.85}
         envMapIntensity={0.8}
         doors={[
-          { wall: 'north', width: 1.6, height: 2.4 },
-          { wall: 'east', width: 1.6, height: 2.4 },
+          { wall: 'east', width: 3.0, height: 3.5 },
+          { wall: 'north', width: 2.8, height: 3.5 },
         ]}
-      />
+      >
+        <Skylight position={[-3, 5.95, -3]} size={[2.5, 2.5]} />
+        <Skylight position={[3, 5.95, 3]} size={[2.5, 2.5]} />
+        <Skylight position={[-3, 5.95, 4]} size={[2, 2]} />
+        <Bench position={[-3.5, 0, -5]} rotation={[0, Math.PI / 2, 0]} />
+        <Bench position={[-3.5, 0, 0]} rotation={[0, Math.PI / 2, 0]} />
+        <Bench position={[-3.5, 0, 5]} rotation={[0, Math.PI / 2, 0]} />
+        <Bench position={[0, 0, 0]} rotation={[0, Math.PI, 0]} />
+        <Column position={[5.5, 0, -3]} height={6} />
+        <Column position={[5.5, 0, 3]} height={6} />
+        <Text position={[0, 5.2, -7.7]} fontSize={0.25} color="#8B7355" anchorX="center">
+          Wing A — The Renaissance
+        </Text>
+        <Text position={[0, 4.8, -7.7]} fontSize={0.1} color="#999" anchorX="center">
+          1400 – 1600
+        </Text>
+        <DoorSign position={[5.9, 3.8, 0]} rotation={[0, -Math.PI / 2, 0]} text="→ Lobby" subtitle="Main Hall" />
+        <DoorSign position={[0, 3.8, -7.9]} text="→ Wing B" subtitle="Baroque Era" />
+        <pointLight position={[0, 5.5, 0]} intensity={4} color="#fff5e0" />
+      </Room>
 
-      {/* Wing B: Baroque */}
+      {/* ── Wing B: Baroque ─────────────────────────────────────────────── */}
       <Room
-        position={[-6, 0, -10]}
-        size={[4, 4, 10]}
+        position={[-13, 0, -16]}
+        size={[12, 6, 16]}
         wallColor="#3d1c1c"
-        floorColor="#1a1010"
+        floorColor="#2a2020"
         ceilingColor="#2a1a1a"
         wallRoughness={0.7}
         wallMetalness={0.05}
-        envMapIntensity={0.6}
+        envMapIntensity={0.4}
         doors={[
-          { wall: 'south', width: 1.6, height: 2.4 },
-          { wall: 'north', width: 1.6, height: 2.4 },
-          { wall: 'east', width: 1.6, height: 2.4 },
+          { wall: 'east', width: 2.8, height: 3.5 },
+          { wall: 'north', width: 2.8, height: 3.5 },
         ]}
-      />
+        omitWalls={['south']}
+      >
+        <Column position={[-5, 0, -6]} height={6} color="#4a3028" />
+        <Column position={[-5, 0, 6]} height={6} color="#4a3028" />
+        <Column position={[5, 0, -5]} height={6} color="#4a3028" />
+        <Column position={[5, 0, 5]} height={6} color="#4a3028" />
+        <Column position={[-3, 0, -6]} height={6} color="#4a3028" />
+        <Column position={[3, 0, 6]} height={6} color="#4a3028" />
+        <Candelabra position={[-3.5, 0, -4]} height={1.8} />
+        <Candelabra position={[-3.5, 0, 4]} height={1.8} />
+        <Candelabra position={[3.5, 0, 0]} height={1.8} />
+        <Candelabra position={[-3.5, 0, 0]} height={1.8} />
+        <Sconce position={[-5.8, 2.8, -5]} rotation={[0, Math.PI / 2, 0]} />
+        <Sconce position={[-5.8, 2.8, -1]} rotation={[0, Math.PI / 2, 0]} />
+        <Sconce position={[-5.8, 2.8, 3]} rotation={[0, Math.PI / 2, 0]} />
+        <Bench position={[-3.5, 0, -2]} rotation={[0, Math.PI / 2, 0]} color="#4a3028" />
+        <Bench position={[-3.5, 0, 2]} rotation={[0, Math.PI / 2, 0]} color="#4a3028" />
+        <Text position={[0, 5.2, -7.7]} fontSize={0.25} color="#c0a070" anchorX="center">
+          Wing B — The Baroque
+        </Text>
+        <Text position={[0, 4.8, -7.7]} fontSize={0.1} color="#806040" anchorX="center">
+          1600 – 1750
+        </Text>
+        <DoorSign position={[5.9, 3.8, 0]} rotation={[0, -Math.PI / 2, 0]} text="→ Immersive" subtitle="Chamber" />
+        <DoorSign position={[0, 3.8, -7.9]} text="→ Wing C" subtitle="Neoclassical & Romantic" />
+      </Room>
 
-      {/* Wing C: Neoclassical & Romantic */}
+      {/* ── Wing C: Neoclassical & Romantic ─────────────────────────────── */}
       <Room
-        position={[-6, 0, -20]}
-        size={[4, 4, 10]}
+        position={[-13, 0, -32]}
+        size={[12, 6, 16]}
         wallColor="#f0ebe0"
-        floorColor="#1e1c18"
+        floorColor="#d8d0c0"
         ceilingColor="#faf7f2"
         wallRoughness={0.9}
         envMapIntensity={1.0}
+        floorTextures={TEX.marble}
+        wallTextures={TEX.marble}
+        floorTileDensity={0.7}
+        wallTileDensity={0.4}
         doors={[
-          { wall: 'south', width: 1.6, height: 2.4 },
-          { wall: 'east', width: 1.6, height: 2.4 },
+          { wall: 'east', width: 2.8, height: 3.5 },
         ]}
-      />
+        omitWalls={['south']}
+      >
+        <Pedestal position={[-4, 0, -5]} />
+        <Urn position={[-4, 1.05, -5]} />
+        <Pedestal position={[4, 0, -5]} />
+        <Urn position={[4, 1.05, -5]} />
+        <Pedestal position={[-4, 0, 5]} />
+        <Urn position={[-4, 1.05, 5]} />
+        <Pedestal position={[4, 0, 5]} />
+        <Urn position={[4, 1.05, 5]} />
+        <Bench position={[-4, 0, 0]} rotation={[0, Math.PI / 2, 0]} />
+        <Bench position={[0, 0, 0]} />
+        <Skylight position={[-2, 5.95, -3]} size={[3, 2.5]} />
+        <Skylight position={[2, 5.95, 3]} size={[2.5, 2.5]} />
+        <Column position={[5.5, 0, -3]} height={6} color="#d0c8b8" />
+        <Column position={[5.5, 0, 3]} height={6} color="#d0c8b8" />
+        <Text position={[0, 5.2, -7.7]} fontSize={0.25} color="#5a4a3a" anchorX="center">
+          Wing C — Neoclassical & Romantic
+        </Text>
+        <Text position={[0, 4.8, -7.7]} fontSize={0.1} color="#999" anchorX="center">
+          1750 – 1850
+        </Text>
+        <DoorSign position={[5.9, 3.8, 0]} rotation={[0, -Math.PI / 2, 0]} text="→ Atrium" subtitle="Central Hub" />
+        <pointLight position={[0, 5.5, 0]} intensity={5} color="#fff5e0" />
+      </Room>
 
       {/* All paintings — world-space positions */}
       {paintings.map((p) => (
@@ -85,266 +240,370 @@ export default function Museum() {
       ))}
 
       {/* ════════════════════════════════════════════════════════════════════
-          CENTER COLUMN — Shared Spaces
+          CENTER COLUMN — 14w × 16d, center x=0
           ════════════════════════════════════════════════════════════════════ */}
 
-      {/* Lobby — Grand entrance hall */}
+      {/* ── Lobby — Grand circular hall (8m tall) ──────────────────────── */}
       <Room
         position={[0, 0, 0]}
-        size={[8, 4, 10]}
+        size={[14, 8, 16]}
         wallColor="#d4cbb8"
-        floorColor="#1a1815"
+        floorColor="#e8dcc8"
         ceilingColor="#ece6d8"
         wallRoughness={0.75}
         envMapIntensity={1.0}
+        floorTextures={TEX.marble}
+        floorTileDensity={0.6}
+        omitWalls={['west']}
+        omitCeiling
         doors={[
-          { wall: 'west', width: 1.6, height: 2.4 },
-          { wall: 'east', width: 1.6, height: 2.4 },
-          { wall: 'north', width: 2.0, height: 2.8 },
+          { wall: 'east', width: 3.0, height: 3.5 },
+          { wall: 'north', width: 3.0, height: 4.0 },
+          { wall: 'south', width: 3.6, height: 5.0 },
         ]}
       >
-        <Text
-          position={[0, 3.2, -4.8]}
-          fontSize={0.3}
-          color="#8B7355"
-          anchorX="center"
-          anchorY="middle"
-        >
+        {/* Grand dome — bottom half of a sphere, positioned at ceiling (y=8).
+            The equator rim sits at y=8, the bowl curves down to y=2 (radius 6).
+            DoubleSide so the concave interior is visible from below. */}
+        <DomeMesh y={8} radius={6} segments={32} color="#e8dcc0" />
+        {/* Fresco band — slightly smaller dome inside */}
+        <DomeMesh y={8} radius={5.8} segments={32} color="#c8a868" emissive="#554422" />
+        {/* Oculus light from dome center */}
+        <pointLight position={[0, 7, 0]} intensity={12} color="#fff5e0" distance={14} decay={2} />
+
+        {/* Circular colonnade — 12 columns at r=5.5m, skipping doorways */}
+        {Array.from({ length: 12 }).map((_, i) => {
+          const angle = (i / 12) * Math.PI * 2
+          const r = 5.5
+          const cx = Math.cos(angle) * r
+          const cz = Math.sin(angle) * r
+          if (Math.abs(cx) < 2.0 && Math.abs(cz) > 4.5) return null
+          if (Math.abs(cz) < 2.0 && Math.abs(cx) > 4.5) return null
+          return <Column key={i} position={[cx, 0, cz]} height={8} radius={0.28} color="#d4cbb8" />
+        })}
+
+        {/* Floor inlay rings */}
+        <mesh position={[0, 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[4.5, 5.0, 48]} />
+          <meshStandardMaterial color="#b8962e" roughness={0.4} metalness={0.3} />
+        </mesh>
+        <mesh position={[0, 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[3.0, 3.1, 48]} />
+          <meshStandardMaterial color="#8B7355" roughness={0.5} />
+        </mesh>
+
+        {/* Central globe */}
+        <Pedestal position={[0, 0, 0]} size={[1.4, 1.8, 1.4]} color="#c8bfa8" />
+        <mesh position={[0, 3.0, 0]}>
+          <sphereGeometry args={[0.9, 32, 20]} />
+          <meshStandardMaterial color="#2a5a7a" roughness={0.3} metalness={0.4} />
+        </mesh>
+        <mesh position={[0, 3.0, 0]} rotation={[0, 0, 0.3]}>
+          <cylinderGeometry args={[0.018, 0.018, 2.2, 6]} />
+          <meshStandardMaterial color="#b8962e" roughness={0.3} metalness={0.7} />
+        </mesh>
+        <mesh position={[0, 3.0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[0.92, 0.012, 8, 48]} />
+          <meshStandardMaterial color="#b8962e" roughness={0.3} metalness={0.7} />
+        </mesh>
+
+        {/* Floor timeline */}
+        <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.12, 14]} />
+          <meshStandardMaterial color="#8B7355" roughness={0.5} />
+        </mesh>
+        {[
+          { z: 6, label: '1400', era: 'Early Renaissance' },
+          { z: 3.5, label: '1500', era: 'High Renaissance' },
+          { z: 1, label: '1600', era: 'Baroque' },
+          { z: -1.5, label: '1700', era: 'Late Baroque' },
+          { z: -4, label: '1800', era: 'Romantic' },
+          { z: -6, label: '1900', era: 'Modern' },
+        ].map((era) => (
+          <group key={era.label}>
+            <mesh position={[0, 0.007, era.z]} rotation={[-Math.PI / 2, 0, 0]}>
+              <circleGeometry args={[0.18, 16]} />
+              <meshStandardMaterial color="#b8962e" roughness={0.4} metalness={0.5} />
+            </mesh>
+            <Text position={[0.5, 0.01, era.z]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.14} color="#8B7355" anchorX="left" anchorY="middle">
+              {era.label}
+            </Text>
+            <Text position={[0.5, 0.01, era.z + 0.3]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.07} color="#a09878" anchorX="left" anchorY="middle">
+              {era.era}
+            </Text>
+          </group>
+        ))}
+
+        {/* Glowing archways */}
+        <ArchFrame position={[-7, 0, 0]} width={3.0} height={4.0} rotation={[0, Math.PI / 2, 0]} color="#c8bfa8" />
+        <pointLight position={[-6.5, 2.5, 0]} intensity={5} color="#e4b03c" distance={7} decay={2} />
+        <Text position={[-6.5, 3.5, 0]} rotation={[0, Math.PI / 2, 0]} fontSize={0.2} color="#e4b03c" anchorX="center">
+          Paintings
+        </Text>
+        <Text position={[-6.5, 3.1, 0]} rotation={[0, Math.PI / 2, 0]} fontSize={0.08} color="#c0983c" anchorX="center">
+          Renaissance · Baroque · Romantic
+        </Text>
+
+        <ArchFrame position={[6.9, 0, 0]} width={3.0} height={4.0} rotation={[0, Math.PI / 2, 0]} color="#c8bfa8" />
+        <pointLight position={[6.5, 2.5, 0]} intensity={5} color="#4a8ac0" distance={7} decay={2} />
+        <Text position={[6.5, 3.5, 0]} rotation={[0, -Math.PI / 2, 0]} fontSize={0.2} color="#4a8ac0" anchorX="center">
+          Music
+        </Text>
+        <Text position={[6.5, 3.1, 0]} rotation={[0, -Math.PI / 2, 0]} fontSize={0.08} color="#3878a0" anchorX="center">
+          Baroque · Classical · Romantic
+        </Text>
+
+        {/* Grand title */}
+        <Text position={[0, 6.5, -7.7]} fontSize={0.55} color="#8B7355" anchorX="center" anchorY="middle">
           Echoes & Visions
         </Text>
-        <Text
-          position={[0, 2.8, -4.8]}
-          fontSize={0.12}
-          color="#666"
-          anchorX="center"
-          anchorY="middle"
-        >
+        <Text position={[0, 5.8, -7.7]} fontSize={0.16} color="#666" anchorX="center" anchorY="middle">
           A Virtual Classical Museum
         </Text>
-        <Text
-          position={[-3.8, 2.6, 0]}
-          fontSize={0.1}
-          color="#997755"
-          anchorX="center"
-          rotation={[0, Math.PI / 2, 0]}
-        >
-          {'← Paintings'}
-        </Text>
-        <Text
-          position={[3.8, 2.6, 0]}
-          fontSize={0.1}
-          color="#997755"
-          anchorX="center"
-          rotation={[0, -Math.PI / 2, 0]}
-        >
-          {'Music →'}
-        </Text>
-        <pointLight position={[0, 3.5, 0]} intensity={5} color="#fff5e0" />
+
+        <DoorSign position={[0, 4.5, -7.7]} text="↑ Immersive Chamber" />
+        <DoorSign position={[0, 5.2, 7.7]} rotation={[0, Math.PI, 0]} text="↓ Exit" subtitle="To Gardens" />
+        <WindowFrame position={[-3, 5.5, 7.9]} size={[1.6, 2.0]} color="#c0a878" />
+        <WindowFrame position={[3, 5.5, 7.9]} size={[1.6, 2.0]} color="#c0a878" />
+        <Chandelier position={[0, 7, 0]} radius={1.8} />
       </Room>
 
-      {/* Immersive Chamber — Dark audiovisual room */}
+      {/* ── Immersive Chamber ───────────────────────────────────────────── */}
       <Room
-        position={[0, 0, -10]}
-        size={[8, 4, 10]}
+        position={[0, 0, -16]}
+        size={[14, 6, 16]}
         wallColor="#0e0e12"
-        floorColor="#080810"
+        floorColor="#2a2830"
         ceilingColor="#060608"
         wallRoughness={0.95}
-        envMapIntensity={0.2}
+        envMapIntensity={0.15}
         doors={[
-          { wall: 'south', width: 2.0, height: 2.8 },
-          { wall: 'north', width: 2.0, height: 2.8 },
-          { wall: 'west', width: 1.6, height: 2.4 },
-          { wall: 'east', width: 1.6, height: 2.4 },
+          { wall: 'east', width: 2.8, height: 3.5 },
+          { wall: 'north', width: 3.0, height: 3.5 },
         ]}
+        omitWalls={['west', 'south']}
       >
-        <Text
-          position={[0, 3.2, -4.8]}
-          fontSize={0.2}
-          color="#334"
-          anchorX="center"
-          anchorY="middle"
-        >
+        <mesh position={[0, 0.1, 0]} receiveShadow>
+          <cylinderGeometry args={[4, 4, 0.2, 32]} />
+          <meshStandardMaterial color="#1a1a24" roughness={0.9} />
+        </mesh>
+        <Text position={[0, 5.2, -7.7]} fontSize={0.25} color="#445" anchorX="center" anchorY="middle">
           Immersive Chamber
         </Text>
-        <pointLight position={[0, 3, 0]} intensity={2} color="#1a1a3a" />
+        <Text position={[0, 4.7, -7.7]} fontSize={0.09} color="#334" anchorX="center" anchorY="middle">
+          A generative audiovisual experience
+        </Text>
+        <pointLight position={[0, 5, 0]} intensity={1.5} color="#1a1a3a" />
+        <pointLight position={[-4, 1.5, -5]} intensity={0.8} color="#2244aa" distance={8} />
+        <pointLight position={[4, 1.5, 5]} intensity={0.8} color="#aa2244" distance={8} />
+        <pointLight position={[0, 1.5, 0]} intensity={0.5} color="#22aa44" distance={6} />
       </Room>
 
-      {/* Central Atrium — Hub */}
+      {/* ── Central Atrium — Hub (7m tall) ──────────────────────────────── */}
       <Room
-        position={[0, 0, -20]}
-        size={[8, 5, 10]}
+        position={[0, 0, -32]}
+        size={[14, 7, 16]}
         wallColor="#c8bfa8"
-        floorColor="#1c1a16"
+        floorColor="#d8ceb8"
+        floorTextures={TEX.marble}
+        floorTileDensity={0.6}
         ceilingColor="#e0d8c8"
         wallRoughness={0.7}
         envMapIntensity={1.2}
         doors={[
-          { wall: 'south', width: 2.0, height: 2.8 },
-          { wall: 'north', width: 2.0, height: 2.8 },
-          { wall: 'west', width: 1.6, height: 2.4 },
-          { wall: 'east', width: 1.6, height: 2.4 },
+          { wall: 'east', width: 3.0, height: 3.5 },
+          { wall: 'north', width: 3.0, height: 4.0 },
         ]}
+        omitWalls={['west', 'south']}
       >
-        <Text
-          position={[0, 4.0, -4.8]}
-          fontSize={0.25}
-          color="#8B7355"
-          anchorX="center"
-          anchorY="middle"
-        >
+        <mesh position={[0, 0.35, 0]} receiveShadow>
+          <cylinderGeometry args={[1.5, 1.8, 0.7, 16]} />
+          <meshStandardMaterial color="#a09888" roughness={0.5} />
+        </mesh>
+        <mesh position={[0, 1.0, 0]}>
+          <cylinderGeometry args={[0.35, 0.6, 0.6, 12]} />
+          <meshStandardMaterial color="#b0a898" roughness={0.4} />
+        </mesh>
+        <Pedestal position={[-5, 0, -6]} color="#b8a888" />
+        <Urn position={[-5, 1.05, -6]} />
+        <Pedestal position={[5, 0, -6]} color="#b8a888" />
+        <Urn position={[5, 1.05, -6]} />
+        <Pedestal position={[-5, 0, 6]} color="#b8a888" />
+        <Urn position={[-5, 1.05, 6]} />
+        <Pedestal position={[5, 0, 6]} color="#b8a888" />
+        <Urn position={[5, 1.05, 6]} />
+        <Bench position={[-3, 0, 0]} rotation={[0, Math.PI / 2, 0]} />
+        <Bench position={[3, 0, 0]} rotation={[0, -Math.PI / 2, 0]} />
+        <Bench position={[0, 0, -4]} />
+        <Bench position={[0, 0, 4]} />
+        <Skylight position={[-3, 6.95, -3]} size={[3, 3]} />
+        <Skylight position={[3, 6.95, 3]} size={[3, 3]} />
+        <Text position={[0, 6.0, -7.7]} fontSize={0.3} color="#8B7355" anchorX="center" anchorY="middle">
           Central Atrium
         </Text>
-        <Text
-          position={[0, 3.6, -4.8]}
-          fontSize={0.1}
-          color="#666"
-          anchorX="center"
-          anchorY="middle"
-        >
+        <Text position={[0, 5.5, -7.7]} fontSize={0.1} color="#666" anchorX="center" anchorY="middle">
           Explore all eras of human genius
         </Text>
-        <pointLight position={[0, 4.5, 0]} intensity={5} color="#fff5e0" />
+        <DoorSign position={[-6.8, 4.0, 0]} rotation={[0, Math.PI / 2, 0]} text="← Wing C" subtitle="Neoclassical & Romantic" />
+        <DoorSign position={[6.8, 4.0, 0]} rotation={[0, -Math.PI / 2, 0]} text="Hall 3 →" subtitle="Romantic Music" />
+        <DoorSign position={[0, 4.5, -7.7]} text="↑ Rooftop Terrace" />
+        <Chandelier position={[0, 6.5, -3]} radius={1.3} />
+        <Chandelier position={[0, 6.5, 3]} radius={1.0} />
+        <pointLight position={[0, 6.5, 0]} intensity={6} color="#fff5e0" />
       </Room>
 
-      {/* Rooftop Terrace */}
+      {/* ── Rooftop Terrace ─────────────────────────────────────────────── */}
       <Room
-        position={[0, 0, -30]}
-        size={[10, 4, 10]}
+        position={[0, 0, -48]}
+        size={[16, 5, 16]}
         wallColor="#c0b8a0"
-        floorColor="#3a3630"
+        floorColor="#a09080"
         ceilingColor="#87CEEB"
         wallRoughness={0.6}
         envMapIntensity={1.5}
-        doors={[
-          { wall: 'south', width: 2.0, height: 2.8 },
-        ]}
+        doors={[]}
+        omitWalls={['south']}
       >
-        <Text
-          position={[0, 3.2, -4.8]}
-          fontSize={0.2}
-          color="#5a4a3a"
-          anchorX="center"
-          anchorY="middle"
-        >
+        <Balustrade position={[0, 0, -7.8]} length={15} />
+        <Balustrade position={[-7.8, 0, 0]} length={15} rotation={[0, Math.PI / 2, 0]} />
+        <Balustrade position={[7.8, 0, 0]} length={15} rotation={[0, Math.PI / 2, 0]} />
+        <Bench position={[-3, 0, -4]} />
+        <Bench position={[3, 0, -4]} />
+        <Bench position={[0, 0, 0]} rotation={[0, Math.PI / 2, 0]} />
+        <Pedestal position={[-7, 0, -7]} size={[0.5, 0.8, 0.5]} />
+        <Urn position={[-7, 0.85, -7]} />
+        <Pedestal position={[7, 0, -7]} size={[0.5, 0.8, 0.5]} />
+        <Urn position={[7, 0.85, -7]} />
+        <Text position={[0, 4.0, -7.7]} fontSize={0.3} color="#5a4a3a" anchorX="center" anchorY="middle">
           Rooftop Terrace
         </Text>
-        <Text
-          position={[0, 2.0, -4.5]}
-          fontSize={0.08}
-          color="#6a5a4a"
-          anchorX="center"
-          anchorY="middle"
-          maxWidth={6}
-          textAlign="center"
-        >
+        <Text position={[0, 2.5, -7.5]} fontSize={0.09} color="#6a5a4a" anchorX="center" anchorY="middle" maxWidth={10} textAlign="center">
           {"You've spent time with the hands and minds of 22 artists\nacross 500 years. What stays with you?"}
         </Text>
-        <pointLight position={[0, 3.5, 0]} intensity={8} color="#ffd4a0" />
-        <pointLight position={[4, 2, -3]} intensity={3} color="#ff9060" />
+        <pointLight position={[0, 4.5, 0]} intensity={8} color="#ffd4a0" />
+        <pointLight position={[6, 2, -5]} intensity={3} color="#ff9060" />
       </Room>
 
       {/* ════════════════════════════════════════════════════════════════════
-          RIGHT COLUMN — Music Halls
+          RIGHT COLUMN — Music Halls (10w × 16d × 6h, center x=+12)
           ════════════════════════════════════════════════════════════════════ */}
 
-      {/* Hall 1: Baroque Music */}
+      {/* ── Hall 1: Baroque Music ───────────────────────────────────────── */}
       <Room
-        position={[6, 0, 0]}
-        size={[4, 4, 10]}
+        position={[12, 0, 0]}
+        size={[10, 6, 16]}
         wallColor="#5c4033"
-        floorColor="#2a1f15"
+        floorColor="#9a7a55"
         ceilingColor="#4a3828"
         wallRoughness={0.6}
         wallMetalness={0.05}
         envMapIntensity={0.7}
         doors={[
-          { wall: 'west', width: 1.6, height: 2.4 },
-          { wall: 'north', width: 1.6, height: 2.4 },
+          { wall: 'north', width: 2.8, height: 3.5 },
         ]}
+        omitWalls={['west']}
       >
-        <Text
-          position={[0, 3.2, -4.8]}
-          fontSize={0.15}
-          color="#c0a878"
-          anchorX="center"
-          anchorY="middle"
-        >
-          Baroque Music Hall
+        <OrganPipes position={[0, 0, -7.5]} count={19} color="#c0b0a0" />
+        <Bench position={[-2, 0, -2]} color="#5c4033" />
+        <Bench position={[2, 0, -2]} color="#5c4033" />
+        <Bench position={[-2, 0, 1]} color="#5c4033" />
+        <Bench position={[2, 0, 1]} color="#5c4033" />
+        <Bench position={[-2, 0, 4]} color="#5c4033" />
+        <Bench position={[2, 0, 4]} color="#5c4033" />
+        <Candelabra position={[-4, 0, -4]} height={1.8} />
+        <Candelabra position={[4, 0, -4]} height={1.8} />
+        <Candelabra position={[-4, 0, 3]} height={1.8} />
+        <Candelabra position={[4, 0, 3]} height={1.8} />
+        <Text position={[0, 5.2, -7.7]} fontSize={0.22} color="#c0a878" anchorX="center" anchorY="middle">
+          Hall I — Baroque Music
         </Text>
-        <pointLight position={[0, 3, 0]} intensity={4} color="#ffe0b0" />
+        <Text position={[0, 4.8, -7.7]} fontSize={0.1} color="#806848" anchorX="center" anchorY="middle">
+          Bach · Vivaldi · Handel
+        </Text>
+        <DoorSign position={[0, 3.8, -7.9]} text="→ Hall II" subtitle="Classical Music" />
+        <pointLight position={[0, 5, 0]} intensity={4} color="#ffe0b0" />
       </Room>
 
-      {/* Hall 2: Classical Music */}
+      {/* ── Hall 2: Classical Music ─────────────────────────────────────── */}
       <Room
-        position={[6, 0, -10]}
-        size={[4, 4, 10]}
+        position={[12, 0, -16]}
+        size={[10, 6, 16]}
         wallColor="#f0ece0"
-        floorColor="#3a3020"
+        floorColor="#c8b898"
         ceilingColor="#faf5ea"
         wallRoughness={0.8}
         envMapIntensity={1.0}
         doors={[
-          { wall: 'west', width: 1.6, height: 2.4 },
-          { wall: 'south', width: 1.6, height: 2.4 },
-          { wall: 'north', width: 1.6, height: 2.4 },
+          { wall: 'north', width: 2.8, height: 3.5 },
         ]}
+        omitWalls={['west', 'south']}
       >
-        <Text
-          position={[0, 3.2, -4.8]}
-          fontSize={0.15}
-          color="#8B7355"
-          anchorX="center"
-          anchorY="middle"
-        >
-          Classical Music Hall
+        <GrandPiano position={[0, 0, -3]} rotation={[0, -Math.PI / 4, 0]} />
+        <Chandelier position={[0, 5.8, 0]} radius={1.2} />
+        <Bench position={[-3, 0, 2]} rotation={[0, 0.3, 0]} />
+        <Bench position={[0, 0, 3]} />
+        <Bench position={[3, 0, 2]} rotation={[0, -0.3, 0]} />
+        <Bench position={[-3, 0, 5]} rotation={[0, 0.3, 0]} />
+        <Bench position={[3, 0, 5]} rotation={[0, -0.3, 0]} />
+        <WindowFrame position={[4.9, 2.8, -5]} size={[1.2, 2.4]} rotation={[0, -Math.PI / 2, 0]} />
+        <WindowFrame position={[4.9, 2.8, -1]} size={[1.2, 2.4]} rotation={[0, -Math.PI / 2, 0]} />
+        <WindowFrame position={[4.9, 2.8, 3]} size={[1.2, 2.4]} rotation={[0, -Math.PI / 2, 0]} />
+        <WindowFrame position={[4.9, 2.8, 6]} size={[1.2, 2.4]} rotation={[0, -Math.PI / 2, 0]} />
+        <Text position={[0, 5.2, -7.7]} fontSize={0.22} color="#8B7355" anchorX="center" anchorY="middle">
+          Hall II — Classical Music
         </Text>
-        <pointLight position={[0, 3, 0]} intensity={5} color="#fffef0" />
+        <Text position={[0, 4.8, -7.7]} fontSize={0.1} color="#806848" anchorX="center" anchorY="middle">
+          Mozart · Beethoven
+        </Text>
+        <DoorSign position={[0, 3.8, -7.9]} text="→ Hall III" subtitle="Romantic Music" />
       </Room>
 
-      {/* Hall 3: Romantic Music */}
+      {/* ── Hall 3: Romantic Music ──────────────────────────────────────── */}
       <Room
-        position={[6, 0, -20]}
-        size={[4, 4, 10]}
+        position={[12, 0, -32]}
+        size={[10, 6, 16]}
         wallColor="#2a2018"
-        floorColor="#1a1510"
+        floorColor="#7a5a3a"
         ceilingColor="#3a2e22"
         wallRoughness={0.65}
         wallMetalness={0.1}
-        envMapIntensity={0.5}
-        doors={[
-          { wall: 'west', width: 1.6, height: 2.4 },
-          { wall: 'south', width: 1.6, height: 2.4 },
-        ]}
+        envMapIntensity={0.4}
+        doors={[]}
+        omitWalls={['west', 'south']}
       >
-        <Text
-          position={[0, 3.2, -4.8]}
-          fontSize={0.15}
-          color="#c0a070"
-          anchorX="center"
-          anchorY="middle"
-        >
-          Romantic Music Hall
+        <GrandPiano position={[1.5, 0, -3]} rotation={[0, Math.PI / 6, 0]} />
+        <Candelabra position={[-4, 0, -6]} height={1.8} />
+        <Candelabra position={[4, 0, -6]} height={1.8} />
+        <Candelabra position={[-4, 0, 0]} height={1.8} />
+        <Candelabra position={[4, 0, 0]} height={1.8} />
+        <Candelabra position={[-4, 0, 6]} height={1.8} />
+        <Candelabra position={[4, 0, 6]} height={1.8} />
+        <WindowFrame position={[4.9, 2.8, -5]} size={[1.2, 2.8]} rotation={[0, -Math.PI / 2, 0]} />
+        <WindowFrame position={[4.9, 2.8, 0]} size={[1.2, 2.8]} rotation={[0, -Math.PI / 2, 0]} />
+        <WindowFrame position={[4.9, 2.8, 5]} size={[1.2, 2.8]} rotation={[0, -Math.PI / 2, 0]} />
+        <Bench position={[-2.5, 0, 2]} rotation={[0, Math.PI / 2, 0]} color="#3a2818" />
+        <Bench position={[-2.5, 0, 5]} rotation={[0, Math.PI / 2, 0]} color="#3a2818" />
+        <Text position={[0, 5.2, -7.7]} fontSize={0.22} color="#c0a070" anchorX="center" anchorY="middle">
+          Hall III — Romantic Music
         </Text>
-        <pointLight position={[-1, 2.5, 0]} intensity={3} color="#ff9050" />
-        <pointLight position={[1, 2.5, 0]} intensity={3} color="#ffa060" />
+        <Text position={[0, 4.8, -7.7]} fontSize={0.1} color="#806848" anchorX="center" anchorY="middle">
+          Chopin · Tchaikovsky · Debussy · Rachmaninoff · Schubert
+        </Text>
       </Room>
 
-      {/* Music stations — world-space positions */}
-      {musicFor('hall1').map((m, i) => (
-        <group key={m.id} position={[5 + i * 1.2, 0, 0]}>
-          <MusicStation data={m} />
-        </group>
-      ))}
+      {/* ════════════════════════════════════════════════════════════════════
+          MUSIC STATIONS
+          ════════════════════════════════════════════════════════════════════ */}
+      {musicFor('hall1').map((m, i) => {
+        const side = i % 2 === 0 ? -3.5 : 3.5
+        const z = -4 + Math.floor(i / 2) * 5
+        return <group key={m.id} position={[12 + side, 0, z]}><MusicStation data={m} /></group>
+      })}
       {musicFor('hall2').map((m, i) => (
-        <group key={m.id} position={[5 + i * 1.2, 0, -10]}>
-          <MusicStation data={m} />
-        </group>
+        <group key={m.id} position={[15, 0, -22 + i * 4]}><MusicStation data={m} /></group>
       ))}
       {musicFor('hall3').map((m, i) => (
-        <group key={m.id} position={[5 + i * 1.0, 0, -20]}>
-          <MusicStation data={m} />
-        </group>
+        <group key={m.id} position={[9, 0, -38 + i * 3]}><MusicStation data={m} /></group>
       ))}
     </group>
   )

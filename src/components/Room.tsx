@@ -1,14 +1,19 @@
-import React from 'react'
-import { MeshReflectorMaterial } from '@react-three/drei'
+import React, { useMemo, useEffect } from 'react'
+import { MeshReflectorMaterial, useTexture } from '@react-three/drei'
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
+import { RepeatWrapping, SRGBColorSpace, MeshStandardMaterial } from 'three'
+import { createTriplanarMaterial } from '../lib/triplanarMaterial'
 
 // Door opening on a wall
 export interface DoorConfig {
   wall: 'north' | 'south' | 'east' | 'west'
   width: number
   height: number
-  /** lateral offset from wall center (positive = right when facing wall) */
   offset?: number
+}
+
+export interface TextureSet {
+  color?: string
 }
 
 export interface RoomProps {
@@ -21,25 +26,33 @@ export interface RoomProps {
   wallMetalness?: number
   envMapIntensity?: number
   doors?: DoorConfig[]
+  omitWalls?: Array<'north' | 'south' | 'east' | 'west'>
+  omitCeiling?: boolean
   useReflectiveFloor?: boolean
+  floorTextures?: TextureSet
+  wallTextures?: TextureSet
+  ceilingTextures?: TextureSet
+  /** Triplanar tile density — tiles per world-meter (e.g. 0.5 = one tile every 2m) */
+  floorTileDensity?: number
+  wallTileDensity?: number
+  ceilingTileDensity?: number
   children?: React.ReactNode
 }
 
 const WALL_DEPTH = 0.2
+const DOOR_COLLIDER_CLEARANCE = 0.3
 
-/**
- * Build the list of box segments needed to represent a wall that may have
- * one door opening cut into it.
- *
- * Returns an array of { pos, size } in the wall's LOCAL axis space where
- * - the wall runs along the U axis (its length)
- * - height is Y
- * - thickness is Z (= WALL_DEPTH, handled by caller)
- *
- * @param wallLength  total length of this wall
- * @param wallHeight  room height
- * @param door        optional door config (already resolved to this wall)
- */
+// ── Default texture paths (color only) ─────────────────────────────────────
+
+const TEX = {
+  floor: { color: '/Materials/Wood083A_1K-JPG/Wood083A_1K-JPG_Color.jpg' },
+  wall: { color: '/Materials/Plaster002_1K-JPG/Plaster002_1K-JPG_Color.jpg' },
+  ceiling: { color: '/Materials/OfficeCeiling001_1K-JPG/OfficeCeiling001_1K-JPG_Color.jpg' },
+  marble: { color: '/Materials/Marble021_1K-JPG/Marble021_1K-JPG_Color.jpg' },
+} as const
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
 function buildWallSegments(
   wallLength: number,
   wallHeight: number,
@@ -52,7 +65,7 @@ function buildWallSegments(
   const dw = door.width
   const dh = door.height
   const offset = door.offset ?? 0
-  const doorCenter = offset // offset from wall mid-point along U axis
+  const doorCenter = offset
   const doorLeft = doorCenter - dw / 2
   const doorRight = doorCenter + dw / 2
   const wallLeft = -wallLength / 2
@@ -60,41 +73,86 @@ function buildWallSegments(
 
   const segments: Array<{ uPos: number; uSize: number; yPos: number; ySize: number }> = []
 
-  // --- Left segment (if any) ---
   const leftWidth = doorLeft - wallLeft
   if (leftWidth > 0.01) {
-    segments.push({
-      uPos: wallLeft + leftWidth / 2,
-      uSize: leftWidth,
-      yPos: wallHeight / 2,
-      ySize: wallHeight,
-    })
+    segments.push({ uPos: wallLeft + leftWidth / 2, uSize: leftWidth, yPos: wallHeight / 2, ySize: wallHeight })
   }
 
-  // --- Right segment (if any) ---
   const rightWidth = wallRight - doorRight
   if (rightWidth > 0.01) {
-    segments.push({
-      uPos: doorRight + rightWidth / 2,
-      uSize: rightWidth,
-      yPos: wallHeight / 2,
-      ySize: wallHeight,
-    })
+    segments.push({ uPos: doorRight + rightWidth / 2, uSize: rightWidth, yPos: wallHeight / 2, ySize: wallHeight })
   }
 
-  // --- Lintel above door ---
   const lintelHeight = wallHeight - dh
   if (lintelHeight > 0.01) {
-    segments.push({
-      uPos: doorCenter,
-      uSize: dw,
-      yPos: dh + lintelHeight / 2,
-      ySize: lintelHeight,
-    })
+    segments.push({ uPos: doorCenter, uSize: dw, yPos: dh + lintelHeight / 2, ySize: lintelHeight })
   }
 
   return segments
 }
+
+/**
+ * Hook: load a color texture and create a triplanar material.
+ * Triplanar mapping projects the texture from world-space, so texel density
+ * is consistent regardless of mesh size — no stretching on any face.
+ */
+function useTriplanarMat(
+  texSet: TextureSet,
+  tileScale: number,
+  color: string,
+  roughness: number,
+  metalness: number,
+  envMapIntensity: number,
+): MeshStandardMaterial {
+  const path = texSet.color || '/Materials/Wood083A_1K-JPG/Wood083A_1K-JPG_Color.jpg'
+  const tex = useTexture(path)
+
+  const mat = useMemo(() => {
+    // Texture needs repeat wrapping for triplanar to tile seamlessly
+    const t = tex.clone()
+    t.wrapS = t.wrapT = RepeatWrapping
+    t.colorSpace = SRGBColorSpace
+
+    return createTriplanarMaterial(
+      { color, roughness, metalness, envMapIntensity, map: t },
+      tileScale,
+    )
+  }, [tex, tileScale, color, roughness, metalness, envMapIntensity])
+
+  useEffect(() => {
+    return () => {
+      if (mat.map) mat.map.dispose()
+      mat.dispose()
+    }
+  }, [mat])
+
+  return mat
+}
+
+/**
+ * Hook: load a color texture with UV-based tiling (for planes only).
+ * Used for floor reflector material which doesn't support custom shaders.
+ */
+function useTiledColorMap(texSet: TextureSet, repeatX: number, repeatY: number) {
+  const path = texSet.color || '/Materials/Wood083A_1K-JPG/Wood083A_1K-JPG_Color.jpg'
+  const colorTex = useTexture(path)
+
+  const tiled = useMemo(() => {
+    const t = colorTex.clone()
+    t.wrapS = t.wrapT = RepeatWrapping
+    t.repeat.set(repeatX, repeatY)
+    t.colorSpace = SRGBColorSpace
+    return { map: t }
+  }, [colorTex, repeatX, repeatY])
+
+  useEffect(() => {
+    return () => { if (tiled.map) tiled.map.dispose() }
+  }, [tiled])
+
+  return tiled
+}
+
+// ── Room component ─────────────────────────────────────────────────────────
 
 export default function Room({
   position = [0, 0, 0],
@@ -104,69 +162,71 @@ export default function Room({
   ceilingColor = '#f5f0e8',
   wallRoughness = 0.85,
   wallMetalness = 0.0,
-  envMapIntensity = 0.8,
+  envMapIntensity = 0.12,
   doors = [],
+  omitWalls = [],
+  omitCeiling = false,
   useReflectiveFloor = false,
+  floorTextures = TEX.floor,
+  wallTextures = TEX.wall,
+  ceilingTextures = TEX.ceiling,
+  floorTileDensity = 0.5,
+  wallTileDensity = 0.5,
+  ceilingTileDensity = 0.3,
   children,
 }: RoomProps) {
   const [width, height, depth] = size
 
-  // Helper: find door for a given wall face
+  // ── Triplanar materials — consistent texel density on every surface ──
+  const wallMat = useTriplanarMat(wallTextures, wallTileDensity, wallColor, wallRoughness, wallMetalness, envMapIntensity)
+  const floorMat = useTriplanarMat(floorTextures, floorTileDensity, floorColor, 0.8, 0.1, envMapIntensity)
+  const ceilingMat = useTriplanarMat(ceilingTextures, ceilingTileDensity, ceilingColor, wallRoughness, 0, envMapIntensity * 0.5)
+
+  // UV-tiled map for reflective floor (MeshReflectorMaterial doesn't support custom shaders)
+  const reflFloorMaps = useTiledColorMap(floorTextures, width * floorTileDensity, depth * floorTileDensity)
+
   const doorFor = (wall: DoorConfig['wall']) => doors.find((d) => d.wall === wall)
 
-  // ── Shared wall material props ──────────────────────────────────────────
-  const wallMatProps = {
-    color: wallColor,
-    roughness: wallRoughness,
-    metalness: wallMetalness,
-    envMapIntensity,
-  }
-
-  // ── Render one set of wall segments for a single wall face ──────────────
-  // `wallLength`  — how long the wall is (X or Z of the room)
-  // `axis`        — 'x' walls run along X (north/south), 'z' walls run along Z (east/west)
-  // `sign`        — +1 or -1 (which side of the room)
-  // `door`        — optional door config for this face
   const renderWall = (
     wallLength: number,
     axis: 'x' | 'z',
     sign: number,
     door?: DoorConfig,
   ) => {
-    const segments = buildWallSegments(wallLength, height, door)
+    const visualSegs = buildWallSegments(wallLength, height, door)
+    const colliderDoor = door
+      ? { ...door, width: door.width + DOOR_COLLIDER_CLEARANCE }
+      : undefined
+    const colliderSegs = buildWallSegments(wallLength, height, colliderDoor)
     const wallOffset = (axis === 'x' ? depth : width) / 2 * sign
 
-    return segments.map((seg, i) => {
-      // Translate segment local coords back to world-space box args
-      let segX: number, segZ: number, segHalfW: number, segHalfD: number
-
+    const toCoords = (seg: { uPos: number; uSize: number; yPos: number; ySize: number }) => {
       if (axis === 'x') {
-        // North/South walls — they run along the X axis, offset along Z
-        segX = seg.uPos
-        segZ = wallOffset
-        segHalfW = seg.uSize / 2
-        segHalfD = WALL_DEPTH / 2
-      } else {
-        // East/West walls — they run along the Z axis, offset along X
-        segX = wallOffset
-        segZ = seg.uPos
-        segHalfW = WALL_DEPTH / 2
-        segHalfD = seg.uSize / 2
+        return { segX: seg.uPos, segZ: wallOffset, halfW: seg.uSize / 2, halfD: WALL_DEPTH / 2 }
       }
+      return { segX: wallOffset, segZ: seg.uPos, halfW: WALL_DEPTH / 2, halfD: seg.uSize / 2 }
+    }
 
-      const segHalfH = seg.ySize / 2
-      const segY = seg.yPos
-
-      return (
-        <RigidBody key={i} type="fixed" position={[segX, segY, segZ]}>
-          <CuboidCollider args={[segHalfW, segHalfH, segHalfD]} />
-          <mesh castShadow receiveShadow>
-            <boxGeometry args={[segHalfW * 2, segHalfH * 2, segHalfD * 2]} />
-            <meshStandardMaterial {...wallMatProps} />
-          </mesh>
-        </RigidBody>
-      )
-    })
+    return (
+      <>
+        {colliderSegs.map((seg, i) => {
+          const { segX, segZ, halfW, halfD } = toCoords(seg)
+          return (
+            <RigidBody key={`c${i}`} type="fixed" position={[segX, seg.yPos, segZ]}>
+              <CuboidCollider args={[halfW, seg.ySize / 2, halfD]} />
+            </RigidBody>
+          )
+        })}
+        {visualSegs.map((seg, i) => {
+          const { segX, segZ, halfW, halfD } = toCoords(seg)
+          return (
+            <mesh key={`m${i}`} position={[segX, seg.yPos, segZ]} castShadow receiveShadow material={wallMat}>
+              <boxGeometry args={[halfW * 2, seg.ySize, halfD * 2]} />
+            </mesh>
+          )
+        })}
+      </>
+    )
   }
 
   return (
@@ -178,6 +238,7 @@ export default function Room({
           <planeGeometry args={[width, depth]} />
           {useReflectiveFloor ? (
             <MeshReflectorMaterial
+              {...reflFloorMaps}
               blur={[400, 100]}
               resolution={1024}
               mixStrength={15}
@@ -190,44 +251,30 @@ export default function Room({
               mirror={0}
             />
           ) : (
-            <meshStandardMaterial
-              color={floorColor}
-              roughness={0.8}
-              metalness={0.1}
-              envMapIntensity={envMapIntensity}
-            />
+            <primitive object={floorMat} attach="material" />
           )}
         </mesh>
       </RigidBody>
 
-      {/* ── Ceiling ───────────────────────────────────────────────────────── */}
-      <RigidBody type="fixed" position={[0, height, 0]}>
-        <CuboidCollider args={[width / 2, 0.05, depth / 2]} />
-        <mesh rotation={[Math.PI / 2, 0, 0]} receiveShadow>
-          <planeGeometry args={[width, depth]} />
-          <meshStandardMaterial
-            color={ceilingColor}
-            roughness={wallRoughness}
-            metalness={wallMetalness}
-            envMapIntensity={envMapIntensity}
-          />
-        </mesh>
-      </RigidBody>
+      {/* ── Ceiling (skipped when omitCeiling is true, e.g. for dome rooms) ── */}
+      {!omitCeiling && (
+        <RigidBody type="fixed" position={[0, height, 0]}>
+          <CuboidCollider args={[width / 2, 0.05, depth / 2]} />
+          <mesh rotation={[Math.PI / 2, 0, 0]} receiveShadow material={ceilingMat}>
+            <planeGeometry args={[width, depth]} />
+          </mesh>
+        </RigidBody>
+      )}
 
-      {/* ── North wall (–Z face, runs along X) ───────────────────────────── */}
-      {renderWall(width, 'x', -1, doorFor('north'))}
+      {/* ── Walls ─────────────────────────────────────────────────────────── */}
+      {!omitWalls.includes('north') && renderWall(width, 'x', -1, doorFor('north'))}
+      {!omitWalls.includes('south') && renderWall(width, 'x', +1, doorFor('south'))}
+      {!omitWalls.includes('west') && renderWall(depth, 'z', -1, doorFor('west'))}
+      {!omitWalls.includes('east') && renderWall(depth, 'z', +1, doorFor('east'))}
 
-      {/* ── South wall (+Z face, runs along X) ───────────────────────────── */}
-      {renderWall(width, 'x', +1, doorFor('south'))}
-
-      {/* ── West wall (–X face, runs along Z) ────────────────────────────── */}
-      {renderWall(depth, 'z', -1, doorFor('west'))}
-
-      {/* ── East wall (+X face, runs along Z) ────────────────────────────── */}
-      {renderWall(depth, 'z', +1, doorFor('east'))}
-
-      {/* Children (paintings, lights, props, etc.) */}
       {children}
     </group>
   )
 }
+
+export { TEX }
