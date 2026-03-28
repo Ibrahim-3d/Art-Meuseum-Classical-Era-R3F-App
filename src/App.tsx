@@ -1,5 +1,5 @@
-import { Suspense } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { Suspense, useRef } from 'react'
+import { Canvas, useFrame } from '@react-three/fiber'
 import { KeyboardControls, Environment, Lightformer } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import {
@@ -8,23 +8,47 @@ import {
   ToneMapping,
   Vignette,
   SMAA,
-  SSAO,
 } from '@react-three/postprocessing'
 import { BlendFunction, ToneMappingMode } from 'postprocessing'
-import { ACESFilmicToneMapping, SRGBColorSpace } from 'three'
+import { ACESFilmicToneMapping, SRGBColorSpace, AmbientLight } from 'three'
+import { getMaxApproachIntensity } from './lib/approachState'
 
 import Player from './components/Player'
 import Museum from './components/Museum'
+import Exterior from './components/Exterior'
 import InfoPanel from './components/InfoPanel'
 import HUD from './components/HUD'
 import Minimap from './components/Minimap'
+import DeepZoom from './components/DeepZoom'
 
 const keyMap = [
   { name: 'forward', keys: ['KeyW', 'ArrowUp'] },
   { name: 'backward', keys: ['KeyS', 'ArrowDown'] },
   { name: 'left', keys: ['KeyA', 'ArrowLeft'] },
   { name: 'right', keys: ['KeyD', 'ArrowRight'] },
+  { name: 'slow', keys: ['Digit1'] },
+  { name: 'normal', keys: ['Digit2'] },
+  { name: 'fast', keys: ['Digit3'] },
 ]
+
+const BASE_AMBIENT = 0.4
+
+/**
+ * Ambient light that dims when the player approaches a painting.
+ * Reads approach intensity from module-level state each frame (no re-renders).
+ */
+function DimmableAmbientLight() {
+  const lightRef = useRef<AmbientLight>(null)
+
+  useFrame(() => {
+    if (!lightRef.current) return
+    // Dim from 100% to 35% based on max approach intensity (matches reference)
+    const dim = 1 - 0.65 * getMaxApproachIntensity()
+    lightRef.current.intensity = BASE_AMBIENT * dim
+  })
+
+  return <ambientLight ref={lightRef} intensity={BASE_AMBIENT} />
+}
 
 export default function App() {
   return (
@@ -37,64 +61,96 @@ export default function App() {
           toneMappingExposure: 1.0,
           outputColorSpace: SRGBColorSpace,
           powerPreference: 'high-performance',
-          stencil: false,
-          depth: true,
         }}
         camera={{
           fov: 65,
           near: 0.1,
-          far: 100,
+          far: 300,
           position: [0, 1.65, 0],
         }}
         dpr={[1, 1.5]}
         style={{ position: 'fixed', top: 0, left: 0 }}
       >
-        {/* Lighting environment — replaces all ambient/directional lights */}
-        <Environment resolution={256}>
+        {/* Indoor museum environment — warm Lightformers replace outdoor HDRI */}
+        <Environment resolution={256} background={false}>
+          {/* Ceiling — broad warm fill from above */}
           <Lightformer
             form="rect"
-            intensity={2}
-            position={[0, 4, 0]}
-            scale={[10, 1, 1]}
-            rotation-x={Math.PI / 2}
+            intensity={0.8}
+            color="#fff5e0"
+            position={[0, 5, 0]}
+            rotation={[Math.PI / 2, 0, 0]}
+            scale={[20, 20, 1]}
+          />
+          {/* Floor bounce — subtle warm uplight */}
+          <Lightformer
+            form="rect"
+            intensity={0.15}
+            color="#d4c8a8"
+            position={[0, -1, 0]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            scale={[20, 20, 1]}
+          />
+          {/* Side walls — gentle neutral fill from each direction */}
+          <Lightformer
+            form="rect"
+            intensity={0.25}
+            color="#e8e0d4"
+            position={[-8, 2.5, 0]}
+            rotation={[0, Math.PI / 2, 0]}
+            scale={[12, 5, 1]}
           />
           <Lightformer
             form="rect"
-            intensity={0.5}
-            position={[-5, 2, -1]}
-            scale={[3, 3, 1]}
-            color="#ffe0c0"
+            intensity={0.25}
+            color="#e8e0d4"
+            position={[8, 2.5, 0]}
+            rotation={[0, -Math.PI / 2, 0]}
+            scale={[12, 5, 1]}
           />
+          {/* Back wall — cooler tint for depth */}
           <Lightformer
             form="rect"
-            intensity={0.3}
-            position={[5, 3, -10]}
-            scale={[4, 2, 1]}
-            color="#e0e8ff"
+            intensity={0.2}
+            color="#c8d0e0"
+            position={[0, 2.5, -10]}
+            rotation={[0, 0, 0]}
+            scale={[16, 5, 1]}
+          />
+          {/* Accent highlight — simulates a skylight hotspot */}
+          <Lightformer
+            form="circle"
+            intensity={1.2}
+            color="#fffaf0"
+            position={[0, 5, -2]}
+            rotation={[Math.PI / 2, 0, 0]}
+            scale={3}
           />
         </Environment>
 
-        {/* Direct lighting for room interiors */}
-        <ambientLight intensity={0.4} />
+        {/* Dimmable ambient light — darkens when approaching paintings */}
+        <DimmableAmbientLight />
+
         <directionalLight
           position={[0, 10, -15]}
           intensity={1.5}
           castShadow
           shadow-mapSize={[2048, 2048]}
-          shadow-camera-left={-20}
-          shadow-camera-right={20}
-          shadow-camera-top={20}
-          shadow-camera-bottom={-20}
-          shadow-camera-far={50}
+          shadow-camera-left={-30}
+          shadow-camera-right={30}
+          shadow-camera-top={30}
+          shadow-camera-bottom={-50}
+          shadow-camera-far={80}
         />
 
-        {/* Fog for depth */}
-        <fog attach="fog" args={['#0a0a0a', 20, 80]} />
+        {/* Fog — lighter for indoor/outdoor, pushed back for exterior views */}
+        <fog attach="fog" args={['#b8c8d8', 40, 180]} />
 
         {/* Physics world */}
         <Physics gravity={[0, -9.81, 0]}>
           <Suspense fallback={null}>
             <Museum />
+            <Exterior />
           </Suspense>
           <Player />
         </Physics>
@@ -102,12 +158,6 @@ export default function App() {
         {/* Post-processing — order matters */}
         <EffectComposer multisampling={0}>
           <SMAA />
-          <SSAO
-            radius={0.05}
-            intensity={30}
-            luminanceInfluence={0.6}
-            color="black"
-          />
           <Bloom
             intensity={0.3}
             luminanceThreshold={0.9}
@@ -127,6 +177,7 @@ export default function App() {
       <InfoPanel />
       <HUD />
       <Minimap />
+      <DeepZoom />
     </KeyboardControls>
   )
 }
