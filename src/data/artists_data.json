@@ -1,0 +1,149 @@
+[
+  {
+    "id": "beethoven",
+    "name": "Ludwig van Beethoven",
+    "wiki": "Ludwig_van_Beethoven",
+    "image": "/artists/beethoven.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "mozart",
+    "name": "Wolfgang Amadeus Mozart",
+    "wiki": "Wolfgang_Amadeus_Mozart",
+    "image": "/artists/mozart.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "bach",
+    "name": "Johann Sebastian Bach",
+    "wiki": "Johann_Sebastian_Bach",
+    "image": "/artists/bach.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "chopin",
+    "name": "Frédéric Chopin",
+    "wiki": "Fr%C3%A9d%C3%A9ric_Chopin",
+    "image": "/artists/chopin.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "vivaldi",
+    "name": "Antonio Vivaldi",
+    "wiki": "Antonio_Vivaldi",
+    "image": "/artists/vivaldi.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "tchaikovsky",
+    "name": "Pyotr Ilyich Tchaikovsky",
+    "wiki": "Pyotr_Ilyich_Tchaikovsky",
+    "image": "/artists/tchaikovsky.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "debussy",
+    "name": "Claude Debussy",
+    "wiki": "Claude_Debussy",
+    "image": "/artists/debussy.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "pachelbel",
+    "name": "Johann Pachelbel",
+    "wiki": "Johann_Pachelbel",
+    "image": "/artists/pachelbel.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "handel",
+    "name": "George Frideric Handel",
+    "wiki": "George_Frideric_Handel",
+    "image": "/artists/handel.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "schubert",
+    "name": "Franz Schubert",
+    "wiki": "Franz_Schubert",
+    "image": "/artists/schubert.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "da-vinci",
+    "name": "Leonardo da Vinci",
+    "wiki": "Leonardo_da_Vinci",
+    "image": "/artists/da-vinci.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "botticelli",
+    "name": "Sandro Botticelli",
+    "wiki": "Sandro_Botticelli",
+    "image": "/artists/botticelli.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "raphael",
+    "name": "Raphael Sanzio",
+    "wiki": "Raphael",
+    "image": "/artists/raphael.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "michelangelo",
+    "name": "Michelangelo Buonarroti",
+    "wiki": "Michelangelo",
+    "image": "/artists/michelangelo.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "vermeer",
+    "name": "Jan Vermeer",
+    "wiki": "Johannes_Vermeer",
+    "image": "/artists/vermeer.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "caravaggio",
+    "name": "Caravaggio",
+    "wiki": "Caravaggio",
+    "image": "/artists/caravaggio.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "rembrandt",
+    "name": "Rembrandt van Rijn",
+    "wiki": "Rembrandt",
+    "image": "/artists/rembrandt.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "velazquez",
+    "name": "Diego Velázquez",
+    "wiki": "Diego_Vel%C3%A1zquez",
+    "image": "/artists/velazquez.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "david",
+    "name": "Jacques-Louis David",
+    "wiki": "Jacques-Louis_David",
+    "image": "/artists/david.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "goya",
+    "name": "Francisco Goya",
+    "wiki": "Francisco_Goya",
+    "image": "/artists/goya.jpg",
+    "imageExists": true
+  },
+  {
+    "id": "delacroix",
+    "name": "Eugène Delacroix",
+    "wiki": "Eug%C3%A8ne_Delacroix",
+    "image": "/artists/delacroix.jpg",
+    "imageExists": true
+  }
+]
