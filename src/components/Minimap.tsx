@@ -1,3 +1,4 @@
+import { useState, useRef, useCallback } from 'react'
 import { useMuseum } from '../stores/useMuseum'
 import type { RoomId } from '../data/paintings'
 
@@ -8,11 +9,10 @@ interface RoomCell {
   row: number   // 0 = top, higher = lower on screen
 }
 
-// Layout: 3 columns × 5 rows
+// Layout: 3 columns × 4 rows
 // Col 0 (left)  — painting wings A/B/C (rows 1/2/3)
-// Col 1 (center)— Rooftop(0), Atrium(1), Immersive(2), Lobby(4)
+// Col 1 (center)— Rooftop(0), Atrium(1), Immersive(2), Lobby(3)
 // Col 2 (right) — music halls 1/2/3 (rows 1/2/3)
-// Rows match world Z: row 0 = z=-30 (furthest), row 3 = z=0 (entrance)
 const ROOM_CELLS: RoomCell[] = [
   { id: 'rooftop',   label: 'Rooftop',     col: 1, row: 0 },
   { id: 'wingC',     label: 'Wing C',      col: 0, row: 1 },
@@ -25,6 +25,20 @@ const ROOM_CELLS: RoomCell[] = [
   { id: 'lobby',     label: 'Lobby',       col: 1, row: 3 },
   { id: 'hall1',     label: 'Hall 1',      col: 2, row: 3 },
 ]
+
+// World-space center positions for each room (y=1.5 = standing height above floor)
+const ROOM_CENTERS: Record<RoomId, { x: number; y: number; z: number }> = {
+  lobby:     { x: 0,   y: 1.5, z: 4 },
+  wingA:     { x: -13, y: 1.5, z: 0 },
+  wingB:     { x: -13, y: 1.5, z: -16 },
+  wingC:     { x: -13, y: 1.5, z: -32 },
+  hall1:     { x: 12,  y: 1.5, z: 0 },
+  hall2:     { x: 12,  y: 1.5, z: -16 },
+  hall3:     { x: 12,  y: 1.5, z: -32 },
+  immersive: { x: 0,   y: 1.5, z: -16 },
+  atrium:    { x: 0,   y: 1.5, z: -32 },
+  rooftop:   { x: 0,   y: 1.5, z: -48 },
+}
 
 const MAP_WIDTH  = 200
 const MAP_HEIGHT = 300
@@ -50,6 +64,26 @@ export default function Minimap() {
   const visitedRooms = useMuseum((s) => s.visitedRooms)
   const showMinimap  = useMuseum((s) => s.showMinimap)
 
+  const [hoveredRoom, setHoveredRoom] = useState<RoomId | null>(null)
+  const [clickedRoom, setClickedRoom] = useState<RoomId | null>(null)
+
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleRoomClick = useCallback((id: RoomId) => {
+    useMuseum.getState().setCurrentRoom(id)
+    useMuseum.getState().setTeleportTarget(ROOM_CENTERS[id])
+
+    // Flash the cell gold for 300ms
+    if (clickTimerRef.current !== null) {
+      clearTimeout(clickTimerRef.current)
+    }
+    setClickedRoom(id)
+    clickTimerRef.current = setTimeout(() => {
+      setClickedRoom(null)
+      clickTimerRef.current = null
+    }, 300)
+  }, [])
+
   if (!showMinimap) return null
 
   return (
@@ -66,7 +100,7 @@ export default function Minimap() {
         borderRadius: 8,
         border: '1px solid rgba(255, 255, 255, 0.1)',
         zIndex: 100,
-        pointerEvents: 'none',
+        pointerEvents: 'auto',
         userSelect: 'none',
         overflow: 'hidden',
       }}
@@ -93,19 +127,39 @@ export default function Minimap() {
       {ROOM_CELLS.map(({ id, label, col, row }) => {
         const isCurrent = id === currentRoom
         const isVisited = visitedRooms.has(id)
+        const isHovered = id === hoveredRoom && !isCurrent
+        const isClicked = id === clickedRoom
 
         let bgColor: string
-        if (isCurrent) {
+        if (isClicked) {
+          bgColor = 'rgba(228, 176, 60, 0.5)'
+        } else if (isCurrent) {
           bgColor = 'rgba(228, 176, 60, 0.25)'
+        } else if (isHovered) {
+          bgColor = 'rgba(228, 176, 60, 0.15)'
         } else if (isVisited) {
           bgColor = 'rgba(255, 255, 255, 0.12)'
         } else {
           bgColor = 'rgba(255, 255, 255, 0.04)'
         }
 
+        let borderStyle: string
+        if (isCurrent) {
+          borderStyle = '2px solid #e4b03c'
+        } else if (isHovered) {
+          borderStyle = '1px solid rgba(228, 176, 60, 0.4)'
+        } else if (isVisited) {
+          borderStyle = '1px solid rgba(255, 255, 255, 0.2)'
+        } else {
+          borderStyle = '1px solid rgba(255, 255, 255, 0.07)'
+        }
+
         return (
           <div
             key={id}
+            onClick={() => handleRoomClick(id)}
+            onMouseEnter={() => setHoveredRoom(id)}
+            onMouseLeave={() => setHoveredRoom(null)}
             style={{
               position: 'absolute',
               left: cellLeft(col),
@@ -114,15 +168,14 @@ export default function Minimap() {
               height: CELL_H,
               backgroundColor: bgColor,
               borderRadius: 4,
-              border: isCurrent
-                ? '2px solid #e4b03c'
-                : isVisited
-                ? '1px solid rgba(255, 255, 255, 0.2)'
-                : '1px solid rgba(255, 255, 255, 0.07)',
+              border: borderStyle,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               boxSizing: 'border-box',
+              cursor: 'pointer',
+              transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+              transition: 'all 0.15s ease',
             }}
           >
             <span
@@ -138,6 +191,7 @@ export default function Minimap() {
                 letterSpacing: '0.04em',
                 textAlign: 'center',
                 lineHeight: 1.3,
+                pointerEvents: 'none',
               }}
             >
               {label}
@@ -145,6 +199,23 @@ export default function Minimap() {
           </div>
         )
       })}
+
+      {/* Tooltip */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 4,
+          left: 0,
+          right: 0,
+          textAlign: 'center',
+          color: 'rgba(255, 255, 255, 0.3)',
+          fontSize: 8,
+          fontFamily: 'sans-serif',
+          letterSpacing: '0.05em',
+        }}
+      >
+        Click room to teleport
+      </div>
     </div>
   )
 }

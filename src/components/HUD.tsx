@@ -21,8 +21,11 @@ export default function HUD() {
   const visitedRooms = useMuseum((s) => s.visitedRooms)
   const isMuted = useMuseum((s) => s.isMuted)
   const toggleMute = useMuseum((s) => s.toggleMute)
+  const nearestPaintingId = useMuseum((s) => s.nearestPaintingId)
+  const deepZoomPainting = useMuseum((s) => s.deepZoomPainting)
 
   const visitedCount = visitedRooms.size
+  const showHints = nearestPaintingId !== null && deepZoomPainting === null
 
   return (
     <>
@@ -76,6 +79,30 @@ export default function HUD() {
         </div>
       </div>
 
+      {/* Bottom-center: proximity hints when near a painting */}
+      {showHints && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 32,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            zIndex: 100,
+            display: 'flex',
+            gap: 28,
+            fontSize: 32,
+            fontFamily: 'Georgia, serif',
+            color: '#fff',
+          }}
+        >
+          <span><kbd style={kbdStyle}>E</kbd> Inspect</span>
+          <span><kbd style={kbdStyle}>Alt</kbd> Zoom</span>
+          <span><kbd style={kbdStyle}>Shift</kbd> Sprint</span>
+        </div>
+      )}
+
       {/* Bottom-right: mute toggle */}
       <button
         onClick={toggleMute}
@@ -102,4 +129,15 @@ export default function HUD() {
       </button>
     </>
   )
+}
+
+const kbdStyle: React.CSSProperties = {
+  display: 'inline-block',
+  padding: '2px 10px',
+  borderRadius: 4,
+  border: '1px solid rgba(255, 255, 255, 0.35)',
+  color: '#fff',
+  fontSize: 24,
+  fontFamily: 'monospace',
+  marginRight: 6,
 }

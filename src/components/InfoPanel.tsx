@@ -2,15 +2,15 @@ import { useMuseum } from '../stores/useMuseum'
 import { paintings } from '../data/paintings'
 
 export default function InfoPanel() {
-  const activePainting = useMuseum((s) => s.activePainting)
-  const showInfoPanel = useMuseum((s) => s.showInfoPanel)
-  const setActivePainting = useMuseum((s) => s.setActivePainting)
+  const nearestPaintingId = useMuseum((s) => s.nearestPaintingId)
+  const deepZoomPainting = useMuseum((s) => s.deepZoomPainting)
   const favoritePaintings = useMuseum((s) => s.favoritePaintings)
   const toggleFavoritePainting = useMuseum((s) => s.toggleFavoritePainting)
 
-  if (!activePainting || !showInfoPanel) return null
+  // Show when near a painting, hide when deep zoom is open
+  if (!nearestPaintingId || deepZoomPainting) return null
 
-  const painting = paintings.find((p) => p.id === activePainting)
+  const painting = paintings.find((p) => p.id === nearestPaintingId)
   if (!painting) return null
 
   const isFavorite = favoritePaintings.has(painting.id)
@@ -49,45 +49,25 @@ export default function InfoPanel() {
           {painting.title}
         </h2>
 
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          {/* Favorite button */}
-          <button
-            onClick={() => toggleFavoritePainting(painting.id)}
-            title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-            style={{
-              background: 'none',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              borderRadius: 4,
-              color: isFavorite ? '#e8b44b' : 'rgba(255, 255, 255, 0.6)',
-              cursor: 'pointer',
-              fontSize: 18,
-              lineHeight: 1,
-              padding: '4px 8px',
-              transition: 'color 0.2s, border-color 0.2s',
-            }}
-          >
-            {isFavorite ? '♥' : '♡'}
-          </button>
-
-          {/* Close button */}
-          <button
-            onClick={() => setActivePainting(null)}
-            title="Close"
-            style={{
-              background: 'none',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              borderRadius: 4,
-              color: 'rgba(255, 255, 255, 0.7)',
-              cursor: 'pointer',
-              fontSize: 16,
-              fontWeight: 700,
-              lineHeight: 1,
-              padding: '4px 9px',
-            }}
-          >
-            ✕
-          </button>
-        </div>
+        {/* Favorite button */}
+        <button
+          onClick={() => toggleFavoritePainting(painting.id)}
+          title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+          style={{
+            background: 'none',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            borderRadius: 4,
+            color: isFavorite ? '#e8b44b' : 'rgba(255, 255, 255, 0.6)',
+            cursor: 'pointer',
+            fontSize: 18,
+            lineHeight: 1,
+            padding: '4px 8px',
+            flexShrink: 0,
+            transition: 'color 0.2s, border-color 0.2s',
+          }}
+        >
+          {isFavorite ? '♥' : '♡'}
+        </button>
       </div>
 
       {/* Artist + year */}
