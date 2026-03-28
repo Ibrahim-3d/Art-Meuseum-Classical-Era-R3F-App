@@ -8,3 +8,5 @@ dist
 Thumbs.db
 .vite
 *.tsbuildinfo
+__pycache__
+*.zip
