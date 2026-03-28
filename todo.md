@@ -1,5 +1,3 @@
-
-
 &#x20; Navigation \& Movement
 
 
@@ -13,10 +11,6 @@
 &#x20; - Speed tiers (1/2/3 keys: Slow/Normal/Fast)
 
 &#x20; - Waypoint system — teleport to any room from minimap or atrium
-
-&#x20; - Timeline scrubber on atrium floor — walk along it to teleport to any era
-
-&#x20; - Room portal transitions (walk through doors → room change)
 
 &#x20; - Head-bob animation while walking
 
