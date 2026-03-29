@@ -6,6 +6,8 @@ import type { RapierRigidBody } from '@react-three/rapier'
 import { Vector3, Raycaster, Vector2, PerspectiveCamera, Matrix3 } from 'three'
 import { useMuseum } from '../stores/useMuseum'
 import { paintings } from '../data/paintings'
+import type { RoomId } from '../data/paintings'
+import { music } from '../data/music'
 import { APPROACH_OUTER } from '../lib/approachState'
 
 // Module-level reusable objects — avoid per-frame GC pressure
@@ -44,13 +46,95 @@ const PITCH_MAX = Math.PI / 3
 // Teleport click drag threshold (pixels)
 const CLICK_DRAG_THRESHOLD = 5
 
-// FOV lens zoom constants (hold Shift = telephoto zoom)
+// FOV lens zoom constants (hold Alt = telephoto zoom)
 const FOV_DEFAULT = 65
 const FOV_ZOOMED = 35 // narrow FOV = magnified view
 const FOV_LERP_SPEED = 6 // degrees per second multiplier for smooth transition
 
 // Nearest painting detection range
 const NEAREST_RANGE = APPROACH_OUTER
+
+// ─── Floor-material footstep audio ───────────────────────────────────────────
+// Three looping audio elements, volume-faded per active floor type.
+const FLOOR_SOUNDS: { marble: HTMLAudioElement; wood: HTMLAudioElement; stone: HTMLAudioElement } = {
+  marble: Object.assign(new Audio('/audio/footstep-marble.mp3'), { loop: true, volume: 0 }),
+  wood:   Object.assign(new Audio('/audio/footstep-wood.mp3'),   { loop: true, volume: 0 }),
+  stone:  Object.assign(new Audio('/audio/footstep-stone.mp3'),  { loop: true, volume: 0 }),
+}
+
+type FloorType = 'marble' | 'wood' | 'stone'
+
+const ROOM_FLOOR: Record<RoomId, FloorType> = {
+  lobby:     'marble',
+  wingA:     'marble',
+  wingB:     'marble',
+  wingC:     'marble',
+  hall1:     'wood',
+  hall2:     'wood',
+  hall3:     'wood',
+  immersive: 'stone',
+  atrium:    'stone',
+  rooftop:   'stone',
+}
+
+let activeFloorType: FloorType = 'marble'
+
+// Footstep fade constants
+const FOOTSTEP_TARGET_VOL = 0.35
+const FOOTSTEP_FADE_SPEED = 3.0
+
+// ─── Audio companion (era-matched ambient near paintings) ─────────────────────
+const companionAudio = new Audio()
+companionAudio.loop = true
+companionAudio.volume = 0
+
+let companionTargetVol = 0
+let activeCompanion = ''
+const COMPANION_VOL = 0.08     // very quiet — just atmosphere
+const COMPANION_FADE_SPEED = 0.5
+
+const WING_COMPANION: Partial<Record<RoomId, string>> = {
+  wingA: 'vivaldi-spring',   // Renaissance wing → Baroque music (closest era available)
+  wingB: 'bach-cello',       // Baroque wing → Bach solo cello (quiet, contemplative)
+  wingC: 'chopin-nocturne',  // Neoclassical/Romantic wing → Chopin nocturne (gentle)
+}
+
+// ─── Room bounds for position-based detection ─────────────────────────────────
+// Each entry: [xMin, xMax, zMin, zMax].  Derived from Museum.tsx room positions + sizes.
+const ROOM_BOUNDS: Array<{ id: RoomId; x0: number; x1: number; z0: number; z1: number }> = [
+  { id: 'wingA',     x0: -19, x1: -7,  z0: -8,  z1: 8   },
+  { id: 'wingB',     x0: -19, x1: -7,  z0: -24, z1: -8  },
+  { id: 'wingC',     x0: -19, x1: -7,  z0: -40, z1: -24 },
+  { id: 'lobby',     x0: -7,  x1: 7,   z0: -8,  z1: 8   },
+  { id: 'immersive', x0: -7,  x1: 7,   z0: -24, z1: -8  },
+  { id: 'atrium',    x0: -7,  x1: 7,   z0: -40, z1: -24 },
+  { id: 'rooftop',   x0: -8,  x1: 8,   z0: -56, z1: -40 },
+  { id: 'hall1',     x0: 7,   x1: 17,  z0: -8,  z1: 8   },
+  { id: 'hall2',     x0: 7,   x1: 17,  z0: -24, z1: -8  },
+  { id: 'hall3',     x0: 7,   x1: 17,  z0: -40, z1: -24 },
+]
+
+/** Detect which room the player is in based on XZ position */
+function detectRoom(x: number, z: number): RoomId {
+  for (const b of ROOM_BOUNDS) {
+    if (x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1) return b.id
+  }
+  return 'lobby' // fallback
+}
+
+// ─── Museum ambient atmosphere ──────────────────────────────────────────────
+const ambientAudio = new Audio('/audio/ambient-wind-light.mp3')
+ambientAudio.loop = true
+ambientAudio.volume = 0
+let ambientStarted = false
+const AMBIENT_VOL = 0.12
+
+// ─── Hall auto-play: first track per hall ────────────────────────────────────
+const HALL_FIRST_TRACK: Partial<Record<RoomId, string>> = {
+  hall1: music.find((m) => m.room === 'hall1')?.id ?? null!,
+  hall2: music.find((m) => m.room === 'hall2')?.id ?? null!,
+  hall3: music.find((m) => m.room === 'hall3')?.id ?? null!,
+}
 
 export default function Player() {
   const bodyRef = useRef<RapierRigidBody>(null)
@@ -89,6 +173,9 @@ export default function Player() {
 
   // Nearest painting tracking (only update store on change)
   const prevNearestRef = useRef<string | null>(null)
+
+  // Room detection tracking (only update store on change)
+  const prevRoomRef = useRef<RoomId>('lobby')
 
   // Set Euler order for FPS camera once on mount
   useEffect(() => {
@@ -310,6 +397,40 @@ export default function Player() {
       useMuseum.getState().setNearestPaintingId(nearestId)
     }
 
+    // --- Room detection ---
+    const detectedRoom = detectRoom(pos.x, pos.z)
+    if (detectedRoom !== prevRoomRef.current) {
+      prevRoomRef.current = detectedRoom
+      useMuseum.getState().setCurrentRoom(detectedRoom)
+
+      // Auto-play first track when entering a music hall
+      const hallTrack = HALL_FIRST_TRACK[detectedRoom]
+      if (hallTrack) {
+        const { playingMusic, setPlayingMusic } = useMuseum.getState()
+        if (!playingMusic || !music.find((m) => m.id === playingMusic && m.room === detectedRoom)) {
+          setPlayingMusic(hallTrack)
+        }
+      }
+    }
+
+    // --- Audio companion for painting wings ---
+    const companionTrack = WING_COMPANION[detectedRoom]
+    if (companionTrack && companionTrack !== activeCompanion) {
+      // Switch companion track
+      companionAudio.src = `/audio/${companionTrack}.mp3`
+      companionAudio.volume = 0
+      companionAudio.play().catch(() => {})
+      activeCompanion = companionTrack
+      companionTargetVol = COMPANION_VOL
+    } else if (!companionTrack && activeCompanion) {
+      // Leaving a wing — fade out companion
+      companionTargetVol = 0
+      activeCompanion = ''
+    }
+    // Suppress companion if main music player is active
+    const mainPlaying = useMuseum.getState().playingMusic
+    if (mainPlaying) companionTargetVol = 0
+
     // --- FOV lens zoom (Alt held = telephoto) ---
     // Safety: if window lost focus or the keyup was missed, force-release
     if (altHeld.current && !document.hasFocus()) {
@@ -395,6 +516,62 @@ export default function Player() {
 
     // Apply camera rotation from right-click drag
     state.camera.rotation.set(pitch.current, yaw.current, 0, 'YXZ')
+
+    // --- Ambient museum atmosphere ---
+    const muted = useMuseum.getState().isMuted
+    ambientAudio.muted = muted
+    if (!ambientStarted && isMoving) {
+      ambientAudio.play().catch(() => {})
+      ambientStarted = true
+    }
+    if (ambientStarted && !ambientAudio.muted) {
+      ambientAudio.volume += (AMBIENT_VOL - ambientAudio.volume) * Math.min(delta * 2, 1)
+    }
+
+    // --- Footstep audio ---
+
+    // Switch floor type when entering a new room
+    const currentFloor = ROOM_FLOOR[detectedRoom]
+    if (currentFloor !== activeFloorType) {
+      const oldSound = FLOOR_SOUNDS[activeFloorType]
+      oldSound.pause()
+      oldSound.volume = 0
+      activeFloorType = currentFloor
+    }
+
+    const activeSound = FLOOR_SOUNDS[activeFloorType]
+    const footstepTargetVol = isMoving && !muted ? FOOTSTEP_TARGET_VOL : 0
+
+    // Fade volume toward target
+    const diff = footstepTargetVol - activeSound.volume
+    if (Math.abs(diff) > 0.001) {
+      activeSound.volume = Math.max(0, Math.min(FOOTSTEP_TARGET_VOL,
+        activeSound.volume + Math.sign(diff) * FOOTSTEP_FADE_SPEED * delta,
+      ))
+    }
+
+    // Play/pause based on movement
+    if (isMoving && !muted && activeSound.paused) {
+      activeSound.play().catch(() => {})
+    } else if ((!isMoving || muted) && !activeSound.paused && activeSound.volume < 0.001) {
+      activeSound.pause()
+    }
+
+    // Playback rate scales with speed tier (walk=0.8, jog=1.0, run=1.4)
+    const speedRates: Record<1 | 2 | 3, number> = { 1: 0.8, 2: 1.0, 3: 1.4 }
+    activeSound.playbackRate = speedRates[speedTier] * (shiftHeld.current ? 1.3 : 1.0)
+
+    // --- Audio companion fade ---
+    activeSound.muted = muted
+    companionAudio.muted = muted
+    const compDiff = companionTargetVol - companionAudio.volume
+    if (Math.abs(compDiff) > 0.001) {
+      companionAudio.volume = Math.max(0, Math.min(COMPANION_VOL,
+        companionAudio.volume + Math.sign(compDiff) * COMPANION_FADE_SPEED * delta,
+      ))
+    } else if (companionTargetVol === 0 && companionAudio.volume < 0.001 && !companionAudio.paused) {
+      companionAudio.pause()
+    }
   })
 
   return (

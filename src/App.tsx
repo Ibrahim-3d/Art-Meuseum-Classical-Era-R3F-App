@@ -20,6 +20,7 @@ import InfoPanel from './components/InfoPanel'
 import HUD from './components/HUD'
 import Minimap from './components/Minimap'
 import DeepZoom from './components/DeepZoom'
+import MusicPlayer from './components/MusicPlayer'
 
 const keyMap = [
   { name: 'forward', keys: ['KeyW', 'ArrowUp'] },
@@ -176,6 +177,7 @@ export default function App() {
       {/* HTML overlay UI */}
       <InfoPanel />
       <HUD />
+      <MusicPlayer />
       <Minimap />
       <DeepZoom />
     </KeyboardControls>

@@ -1,8 +1,7 @@
-import React, { useMemo, useEffect } from 'react'
+import React, { useMemo } from 'react'
 import { MeshReflectorMaterial, useTexture } from '@react-three/drei'
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
 import { RepeatWrapping, SRGBColorSpace, MeshStandardMaterial } from 'three'
-import { createTriplanarMaterial } from '../lib/triplanarMaterial'
 
 // Door opening on a wall
 export interface DoorConfig {
@@ -32,7 +31,6 @@ export interface RoomProps {
   floorTextures?: TextureSet
   wallTextures?: TextureSet
   ceilingTextures?: TextureSet
-  /** Triplanar tile density — tiles per world-meter (e.g. 0.5 = one tile every 2m) */
   floorTileDensity?: number
   wallTileDensity?: number
   ceilingTileDensity?: number
@@ -42,16 +40,13 @@ export interface RoomProps {
 const WALL_DEPTH = 0.2
 const DOOR_COLLIDER_CLEARANCE = 0.3
 
-// ── Default texture paths (color only) ─────────────────────────────────────
-
+// Default texture paths (color only)
 const TEX = {
   floor: { color: '/Materials/Wood083A_1K-JPG/Wood083A_1K-JPG_Color.jpg' },
   wall: { color: '/Materials/Plaster002_1K-JPG/Plaster002_1K-JPG_Color.jpg' },
   ceiling: { color: '/Materials/OfficeCeiling001_1K-JPG/OfficeCeiling001_1K-JPG_Color.jpg' },
   marble: { color: '/Materials/Marble021_1K-JPG/Marble021_1K-JPG_Color.jpg' },
 } as const
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 
 function buildWallSegments(
   wallLength: number,
@@ -92,64 +87,37 @@ function buildWallSegments(
 }
 
 /**
- * Hook: load a color texture and create a triplanar material.
- * Triplanar mapping projects the texture from world-space, so texel density
- * is consistent regardless of mesh size — no stretching on any face.
+ * Create a simple tiled MeshStandardMaterial — no custom shaders.
+ * Uses UV repeat for tiling. Avoids the texture-unit overflow that
+ * the triplanar onBeforeCompile approach caused.
  */
-function useTriplanarMat(
+function useTiledMaterial(
   texSet: TextureSet,
-  tileScale: number,
+  tileX: number,
+  tileY: number,
   color: string,
   roughness: number,
   metalness: number,
   envMapIntensity: number,
 ): MeshStandardMaterial {
-  const path = texSet.color || '/Materials/Wood083A_1K-JPG/Wood083A_1K-JPG_Color.jpg'
+  const path = texSet.color || TEX.wall.color
   const tex = useTexture(path)
 
-  const mat = useMemo(() => {
-    // Texture needs repeat wrapping for triplanar to tile seamlessly
+  return useMemo(() => {
     const t = tex.clone()
     t.wrapS = t.wrapT = RepeatWrapping
+    t.repeat.set(tileX, tileY)
     t.colorSpace = SRGBColorSpace
+    t.needsUpdate = true
 
-    return createTriplanarMaterial(
-      { color, roughness, metalness, envMapIntensity, map: t },
-      tileScale,
-    )
-  }, [tex, tileScale, color, roughness, metalness, envMapIntensity])
-
-  useEffect(() => {
-    return () => {
-      if (mat.map) mat.map.dispose()
-      mat.dispose()
-    }
-  }, [mat])
-
-  return mat
-}
-
-/**
- * Hook: load a color texture with UV-based tiling (for planes only).
- * Used for floor reflector material which doesn't support custom shaders.
- */
-function useTiledColorMap(texSet: TextureSet, repeatX: number, repeatY: number) {
-  const path = texSet.color || '/Materials/Wood083A_1K-JPG/Wood083A_1K-JPG_Color.jpg'
-  const colorTex = useTexture(path)
-
-  const tiled = useMemo(() => {
-    const t = colorTex.clone()
-    t.wrapS = t.wrapT = RepeatWrapping
-    t.repeat.set(repeatX, repeatY)
-    t.colorSpace = SRGBColorSpace
-    return { map: t }
-  }, [colorTex, repeatX, repeatY])
-
-  useEffect(() => {
-    return () => { if (tiled.map) tiled.map.dispose() }
-  }, [tiled])
-
-  return tiled
+    return new MeshStandardMaterial({
+      map: t,
+      color,
+      roughness,
+      metalness,
+      envMapIntensity,
+    })
+  }, [tex, tileX, tileY, color, roughness, metalness, envMapIntensity])
 }
 
 // ── Room component ─────────────────────────────────────────────────────────
@@ -177,13 +145,28 @@ export default function Room({
 }: RoomProps) {
   const [width, height, depth] = size
 
-  // ── Triplanar materials — consistent texel density on every surface ──
-  const wallMat = useTriplanarMat(wallTextures, wallTileDensity, wallColor, wallRoughness, wallMetalness, envMapIntensity)
-  const floorMat = useTriplanarMat(floorTextures, floorTileDensity, floorColor, 0.8, 0.1, envMapIntensity)
-  const ceilingMat = useTriplanarMat(ceilingTextures, ceilingTileDensity, ceilingColor, wallRoughness, 0, envMapIntensity * 0.5)
+  // Simple UV-tiled materials — consistent tiling, no shader hacks
+  const wallTileX = width * wallTileDensity
+  const wallTileY = height * wallTileDensity
+  const wallMat = useTiledMaterial(wallTextures, wallTileX, wallTileY, wallColor, wallRoughness, wallMetalness, envMapIntensity)
+  const ceilingMat = useTiledMaterial(ceilingTextures, width * ceilingTileDensity, depth * ceilingTileDensity, ceilingColor, wallRoughness, 0, envMapIntensity * 0.5)
 
-  // UV-tiled map for reflective floor (MeshReflectorMaterial doesn't support custom shaders)
-  const reflFloorMaps = useTiledColorMap(floorTextures, width * floorTileDensity, depth * floorTileDensity)
+  // Floor: UV-tiled map for reflective floor, or standard material
+  const floorTileX = width * floorTileDensity
+  const floorTileY = depth * floorTileDensity
+  const floorMat = useTiledMaterial(floorTextures, floorTileX, floorTileY, floorColor, 0.8, 0.1, envMapIntensity)
+
+  // Reflective floor needs its own tiled texture (MeshReflectorMaterial doesn't accept a pre-built material)
+  const reflFloorPath = floorTextures.color || TEX.floor.color
+  const reflFloorTex = useTexture(reflFloorPath)
+  const reflFloorMap = useMemo(() => {
+    const t = reflFloorTex.clone()
+    t.wrapS = t.wrapT = RepeatWrapping
+    t.repeat.set(floorTileX, floorTileY)
+    t.colorSpace = SRGBColorSpace
+    t.needsUpdate = true
+    return t
+  }, [reflFloorTex, floorTileX, floorTileY])
 
   const doorFor = (wall: DoorConfig['wall']) => doors.find((d) => d.wall === wall)
 
@@ -238,7 +221,7 @@ export default function Room({
           <planeGeometry args={[width, depth]} />
           {useReflectiveFloor ? (
             <MeshReflectorMaterial
-              {...reflFloorMaps}
+              map={reflFloorMap}
               blur={[400, 100]}
               resolution={1024}
               mixStrength={15}
@@ -256,7 +239,7 @@ export default function Room({
         </mesh>
       </RigidBody>
 
-      {/* ── Ceiling (skipped when omitCeiling is true, e.g. for dome rooms) ── */}
+      {/* ── Ceiling ────────────────────────────────────────────────────────── */}
       {!omitCeiling && (
         <RigidBody type="fixed" position={[0, height, 0]}>
           <CuboidCollider args={[width / 2, 0.05, depth / 2]} />

@@ -594,17 +594,24 @@ export default function Museum() {
       {/* ════════════════════════════════════════════════════════════════════
           MUSIC STATIONS
           ════════════════════════════════════════════════════════════════════ */}
+      {/* Hall 1 (Baroque): 5 stations, staggered left/right along the hall */}
       {musicFor('hall1').map((m, i) => {
-        const side = i % 2 === 0 ? -3.5 : 3.5
-        const z = -4 + Math.floor(i / 2) * 5
-        return <group key={m.id} position={[12 + side, 0, z]}><MusicStation data={m} /></group>
+        const side = i % 2 === 0 ? -3 : 3
+        const z = -5 + Math.floor(i / 2) * 4.5
+        return <group key={m.id} position={[12 + side, 0, z]} rotation={[0, side > 0 ? -0.3 : 0.3, 0]}><MusicStation data={m} /></group>
       })}
-      {musicFor('hall2').map((m, i) => (
-        <group key={m.id} position={[15, 0, -22 + i * 4]}><MusicStation data={m} /></group>
-      ))}
-      {musicFor('hall3').map((m, i) => (
-        <group key={m.id} position={[9, 0, -38 + i * 3]}><MusicStation data={m} /></group>
-      ))}
+      {/* Hall 2 (Classical): 4 stations, staggered */}
+      {musicFor('hall2').map((m, i) => {
+        const side = i % 2 === 0 ? -3 : 3
+        const z = -21 + Math.floor(i / 2) * 5
+        return <group key={m.id} position={[12 + side, 0, z]} rotation={[0, side > 0 ? -0.3 : 0.3, 0]}><MusicStation data={m} /></group>
+      })}
+      {/* Hall 3 (Romantic): 6 stations, staggered */}
+      {musicFor('hall3').map((m, i) => {
+        const side = i % 2 === 0 ? -3 : 3
+        const z = -38 + Math.floor(i / 2) * 4
+        return <group key={m.id} position={[12 + side, 0, z]} rotation={[0, side > 0 ? -0.3 : 0.3, 0]}><MusicStation data={m} /></group>
+      })}
     </group>
   )
 }
