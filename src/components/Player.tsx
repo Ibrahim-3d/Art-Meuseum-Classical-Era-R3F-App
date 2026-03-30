@@ -54,6 +54,12 @@ const FOV_LERP_SPEED = 6 // degrees per second multiplier for smooth transition
 // Nearest painting detection range
 const NEAREST_RANGE = APPROACH_OUTER
 
+// Spawn point — inside the lobby, clear above the floor so Rapier WASM has time to register colliders
+const SPAWN_POSITION = { x: 0, y: 3, z: 6 } as const
+
+// Y threshold below which the player is considered to have fallen out of the world
+const FALL_THRESHOLD = -10
+
 // ─── Floor-material footstep audio ───────────────────────────────────────────
 // Three looping audio elements, volume-faded per active floor type.
 const FLOOR_SOUNDS: { marble: HTMLAudioElement; wood: HTMLAudioElement; stone: HTMLAudioElement } = {
@@ -327,6 +333,12 @@ export default function Player() {
     const body = bodyRef.current
     if (!body) return
 
+    // --- Fall-out-of-world safety: respawn if the player falls below the world ---
+    if (body.translation().y < FALL_THRESHOLD) {
+      body.setTranslation(SPAWN_POSITION, true)
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+    }
+
     // Skip movement if deep zoom is open
     const deepZoomOpen = useMuseum.getState().deepZoomPainting !== null
     if (deepZoomOpen) {
@@ -579,7 +591,7 @@ export default function Player() {
       <RigidBody
         ref={bodyRef}
         type="dynamic"
-        position={[0, 0.9, 14]}
+        position={[SPAWN_POSITION.x, SPAWN_POSITION.y, SPAWN_POSITION.z]}
         lockRotations
         colliders={false}
       >
