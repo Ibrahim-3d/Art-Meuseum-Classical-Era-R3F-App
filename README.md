@@ -89,19 +89,6 @@ npm run build
 npm run preview
 ```
 
----
-
-## Project Team
-
-| Name | ID | Field |
-|------|-----|-------|
-| Mahmoud Refaat Mohamed Badr | 25100559 | Engineering |
-| Nour Mabrok Atia | 21100366 | Interior Design |
-| Bassant Ahmed Outa | 24101348 | Pharmacy |
-| Mohamed Hussien Mohamed | 25102156 | Basic Science |
-| Ibrahim Elsayed Ibrahim Mahmoud | 21100370 | Interior Design |
-
----
 
 ## License
 
