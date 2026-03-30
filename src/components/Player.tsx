@@ -57,9 +57,9 @@ const NEAREST_RANGE = APPROACH_OUTER
 // ─── Floor-material footstep audio ───────────────────────────────────────────
 // Three looping audio elements, volume-faded per active floor type.
 const FLOOR_SOUNDS: { marble: HTMLAudioElement; wood: HTMLAudioElement; stone: HTMLAudioElement } = {
-  marble: Object.assign(new Audio('/audio/footstep-marble.mp3'), { loop: true, volume: 0 }),
-  wood:   Object.assign(new Audio('/audio/footstep-wood.mp3'),   { loop: true, volume: 0 }),
-  stone:  Object.assign(new Audio('/audio/footstep-stone.mp3'),  { loop: true, volume: 0 }),
+  marble: Object.assign(new Audio('/audio/footstep-marble.ogg'), { loop: true, volume: 0 }),
+  wood:   Object.assign(new Audio('/audio/footstep-wood.ogg'),   { loop: true, volume: 0 }),
+  stone:  Object.assign(new Audio('/audio/footstep-stone.ogg'),  { loop: true, volume: 0 }),
 }
 
 type FloorType = 'marble' | 'wood' | 'stone'
@@ -123,7 +123,7 @@ function detectRoom(x: number, z: number): RoomId {
 }
 
 // ─── Museum ambient atmosphere ──────────────────────────────────────────────
-const ambientAudio = new Audio('/audio/ambient-wind-light.mp3')
+const ambientAudio = new Audio('/audio/ambient-wind-light.ogg')
 ambientAudio.loop = true
 ambientAudio.volume = 0
 let ambientStarted = false
@@ -417,7 +417,7 @@ export default function Player() {
     const companionTrack = WING_COMPANION[detectedRoom]
     if (companionTrack && companionTrack !== activeCompanion) {
       // Switch companion track
-      companionAudio.src = `/audio/${companionTrack}.mp3`
+      companionAudio.src = `/audio/${companionTrack}.ogg`
       companionAudio.volume = 0
       companionAudio.play().catch(() => {})
       activeCompanion = companionTrack

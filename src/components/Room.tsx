@@ -42,10 +42,10 @@ const DOOR_COLLIDER_CLEARANCE = 0.3
 
 // Default texture paths (color only)
 const TEX = {
-  floor: { color: '/Materials/Wood083A_1K-JPG/Wood083A_1K-JPG_Color.jpg' },
-  wall: { color: '/Materials/Plaster002_1K-JPG/Plaster002_1K-JPG_Color.jpg' },
-  ceiling: { color: '/Materials/OfficeCeiling001_1K-JPG/OfficeCeiling001_1K-JPG_Color.jpg' },
-  marble: { color: '/Materials/Marble021_1K-JPG/Marble021_1K-JPG_Color.jpg' },
+  floor: { color: '/Materials/Wood083A_1K-JPG/Wood083A_1K-JPG_Color.webp' },
+  wall: { color: '/Materials/Plaster002_1K-JPG/Plaster002_1K-JPG_Color.webp' },
+  ceiling: { color: '/Materials/OfficeCeiling001_1K-JPG/OfficeCeiling001_1K-JPG_Color.webp' },
+  marble: { color: '/Materials/Marble021_1K-JPG/Marble021_1K-JPG_Color.webp' },
 } as const
 
 function buildWallSegments(

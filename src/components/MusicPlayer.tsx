@@ -406,7 +406,7 @@ export default function MusicPlayer() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         {/* Composer portrait — clickable to toggle bio */}
         <img
-          src={`/artists/${track.composerId}.jpg`}
+          src={`/artists/${track.composerId}.webp`}
           alt={track.composer}
           onClick={() => setShowBio((prev) => !prev)}
           onError={(e) => {

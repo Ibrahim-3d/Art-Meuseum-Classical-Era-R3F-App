@@ -10,3 +10,5 @@ Thumbs.db
 *.tsbuildinfo
 __pycache__
 *.zip
+
+.vercel

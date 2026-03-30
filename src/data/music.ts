@@ -25,7 +25,7 @@ export const music: MusicData[] = [
     era: 'Baroque',
     year: 'c. 1704',
     youtubeUrl: 'https://www.youtube.com/watch?v=ho9rZjlsyYY',
-    audioFile: '/audio/bach-toccata.mp3',
+    audioFile: '/audio/bach-toccata.ogg',
     description:
       'Dramatic organ work. Cascading toccata launches into complex three-voice fugue. The definitive pipe organ sound.',
     analysis:
@@ -41,7 +41,7 @@ export const music: MusicData[] = [
     era: 'Baroque',
     year: 'c. 1720',
     youtubeUrl: 'https://www.youtube.com/watch?v=1prweT95Mo0',
-    audioFile: '/audio/bach-cello.mp3',
+    audioFile: '/audio/bach-cello.ogg',
     description:
       'Six movements for solo cello. The Prelude — flowing arpeggios that seem to breathe on their own.',
     analysis:
@@ -57,7 +57,7 @@ export const music: MusicData[] = [
     era: 'Baroque',
     year: '1725',
     youtubeUrl: 'https://www.youtube.com/watch?v=ZPdk5GaIDjo',
-    audioFile: '/audio/vivaldi-spring.mp3',
+    audioFile: '/audio/vivaldi-spring.ogg',
     description:
       'First of four violin concertos depicting seasons. Birdsong, brooks, and storms rendered through instruments.',
     analysis:
@@ -73,7 +73,7 @@ export const music: MusicData[] = [
     era: 'Baroque',
     year: 'c. 1680–1706',
     youtubeUrl: 'https://www.youtube.com/watch?v=JvNQLJ1_HQ0',
-    audioFile: '/audio/pachelbel-canon.mp3',
+    audioFile: '/audio/pachelbel-canon.ogg',
     description:
       'Canon for three violins and basso continuo. Eight-note ground bass repeats while violin lines spiral upward.',
     analysis:
@@ -89,7 +89,7 @@ export const music: MusicData[] = [
     era: 'Baroque',
     year: '1741',
     youtubeUrl: 'https://www.youtube.com/watch?v=IUZEtVbJT5c',
-    audioFile: '/audio/handel-hallelujah.mp3',
+    audioFile: '/audio/handel-hallelujah.ogg',
     description:
       "Part II finale of Handel's oratorio. Audience traditionally stands. King George II allegedly rose at the premiere.",
     analysis:
@@ -107,7 +107,7 @@ export const music: MusicData[] = [
     era: 'Classical',
     year: '1791',
     youtubeUrl: 'https://www.youtube.com/watch?v=sPlhKP0nZII',
-    audioFile: '/audio/mozart-requiem.mp3',
+    audioFile: '/audio/mozart-requiem.ogg',
     description:
       "Mozart's final, unfinished mass for the dead. The Lacrimosa is devastatingly beautiful. Completed by Süssmayr.",
     analysis:
@@ -123,7 +123,7 @@ export const music: MusicData[] = [
     era: 'Classical',
     year: '1787',
     youtubeUrl: 'https://www.youtube.com/watch?v=oy2zDJPIgwc',
-    audioFile: '/audio/mozart-eine-kleine.mp3',
+    audioFile: '/audio/mozart-eine-kleine.ogg',
     description:
       'Serenade in four movements for strings. Opening allegro is one of the most recognizable melodies in classical music.',
     analysis:
@@ -139,7 +139,7 @@ export const music: MusicData[] = [
     era: 'Classical / Early Romantic',
     year: '1808',
     youtubeUrl: 'https://www.youtube.com/watch?v=fOk8Tm815lE',
-    audioFile: '/audio/beethoven-symphony5.mp3',
+    audioFile: '/audio/beethoven-symphony5.ogg',
     description:
       'Four movements opening with the most famous four notes in music. Journeys from C minor struggle to C major triumph.',
     analysis:
@@ -155,7 +155,7 @@ export const music: MusicData[] = [
     era: 'Classical / Early Romantic',
     year: '1801',
     youtubeUrl: 'https://www.youtube.com/watch?v=4Tr0otuiQuU',
-    audioFile: '/audio/beethoven-moonlight.mp3',
+    audioFile: '/audio/beethoven-moonlight.ogg',
     description:
       'Three movements. Famous first movement: slow hypnotic arpeggiated figure over sustained bass evoking moonlit water.',
     analysis:
@@ -173,7 +173,7 @@ export const music: MusicData[] = [
     era: 'Romantic',
     year: '1835',
     youtubeUrl: 'https://www.youtube.com/watch?v=RR7eUSFEn5I',
-    audioFile: '/audio/chopin-ballade.mp3',
+    audioFile: '/audio/chopin-ballade.ogg',
     description:
       'Large-scale solo piano work. Narrative arc from questioning opening to devastating virtuosic coda.',
     analysis:
@@ -189,7 +189,7 @@ export const music: MusicData[] = [
     era: 'Romantic',
     year: '1832',
     youtubeUrl: 'https://www.youtube.com/watch?v=YGRO05WcNDk',
-    audioFile: '/audio/chopin-nocturne.mp3',
+    audioFile: '/audio/chopin-nocturne.ogg',
     description:
       "Gentle singing melody over rocking left-hand accompaniment. Epitomizes the nocturne 'night piece' form.",
     analysis:
@@ -205,7 +205,7 @@ export const music: MusicData[] = [
     era: 'Late Romantic',
     year: '1876',
     youtubeUrl: 'https://www.youtube.com/watch?v=9cNQFB0TDfY',
-    audioFile: '/audio/tchaikovsky-swan-lake.mp3',
+    audioFile: '/audio/tchaikovsky-swan-lake.ogg',
     description:
       "Ballet music. The 'Scene' theme — descending oboe over harp arpeggios — synonymous with classical ballet.",
     analysis:
@@ -221,7 +221,7 @@ export const music: MusicData[] = [
     era: 'Late Romantic',
     year: '1880',
     youtubeUrl: 'https://www.youtube.com/watch?v=VbxgYlcNxE8',
-    audioFile: '/audio/tchaikovsky-1812.mp3',
+    audioFile: '/audio/tchaikovsky-1812.ogg',
     description:
       'Festival overture commemorating Russia vs. Napoleon. Calls for real cannons and church bells in the climax.',
     analysis:
@@ -237,7 +237,7 @@ export const music: MusicData[] = [
     era: 'Impressionism',
     year: '1905',
     youtubeUrl: 'https://www.youtube.com/watch?v=CvFH_6DNRCY',
-    audioFile: '/audio/debussy-clair-de-lune.mp3',
+    audioFile: '/audio/debussy-clair-de-lune.ogg',
     description:
       'Third movement of Suite bergamasque for solo piano. Arpeggiated figures evoke moonlight on water.',
     analysis:
@@ -253,7 +253,7 @@ export const music: MusicData[] = [
     era: 'Early Romantic',
     year: '1825',
     youtubeUrl: 'https://www.youtube.com/watch?v=2bosouX_d8Y',
-    audioFile: '/audio/schubert-ave-maria.mp3',
+    audioFile: '/audio/schubert-ave-maria.ogg',
     description:
       "Song from Walter Scott's 'The Lady of the Lake.' Rippling piano beneath sustained vocal. Later adapted to Latin prayer.",
     analysis:

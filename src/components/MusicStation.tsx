@@ -9,7 +9,7 @@ import { useMuseum } from '../stores/useMuseum'
 // ── Floating portrait image ─────────────────────────────────────────────────
 
 function ComposerPortrait({ composerId, size = 0.7 }: { composerId: string; size?: number }) {
-  const texture = useTexture(`/artists/${composerId}.jpg`)
+  const texture = useTexture(`/artists/${composerId}.webp`)
   const meshRef = useRef<Mesh>(null)
 
   // Gentle float: bob up/down + slow Y rotation
