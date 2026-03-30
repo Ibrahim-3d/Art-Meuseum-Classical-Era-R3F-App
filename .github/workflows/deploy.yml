@@ -32,7 +32,7 @@ jobs:
         env:
           # Set base path to repo name so assets resolve correctly on GitHub Pages
           # Change this if you rename the repo or use a custom domain (set to /)
-          VITE_BASE: /echoes-and-visions-museum/
+          VITE_BASE: /Art-Meuseum-Classical-Era-R3F-App/
 
       - uses: actions/upload-pages-artifact@v3
         with:
