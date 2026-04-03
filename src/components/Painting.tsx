@@ -22,6 +22,10 @@ type LoadState = 'checking' | 'ready' | 'failed'
 // Reusable vector to avoid per-frame allocation
 const _paintingPos = new Vector3()
 
+// Load textures only when player enters this radius — defers all 14 texture
+// fetches until the painting is actually reachable, saving initial VRAM + load time
+const LOD_LOAD_DISTANCE = 20
+
 function handleClick(data: PaintingData) {
   return (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
@@ -81,6 +85,11 @@ export default function Painting({ data }: PaintingProps) {
   // Smooth approach intensity (lerped per frame, not React state)
   const approachRef = useRef(0)
 
+  // Lazy texture loading — flips once to true when player enters LOD_LOAD_DISTANCE.
+  // Never resets to false so the texture isn't unloaded when the player walks away.
+  const isInRangeRef = useRef(false)
+  const [textureShouldLoad, setTextureShouldLoad] = useState(false)
+
   useEffect(() => {
     if (lightRef.current && targetRef.current) {
       lightRef.current.target = targetRef.current
@@ -100,6 +109,12 @@ export default function Painting({ data }: PaintingProps) {
     // Calculate distance from camera to painting center
     _paintingPos.set(data.position[0], data.position[1], data.position[2])
     const dist = camera.position.distanceTo(_paintingPos)
+
+    // Trigger texture load once when player enters LOD radius
+    if (!isInRangeRef.current && dist < LOD_LOAD_DISTANCE) {
+      isInRangeRef.current = true
+      setTextureShouldLoad(true)
+    }
 
     // Only activate when player is on the viewing side (in front, not behind wall)
     const nx = Math.sin(data.rotation[1])
@@ -127,6 +142,11 @@ export default function Painting({ data }: PaintingProps) {
 
     // Write to shared approach state for ambient dimming
     setApproachIntensity(data.id, approachRef.current)
+
+    if (lightRef.current) {
+      lightRef.current.visible = approachRef.current > 0.01
+      lightRef.current.intensity = 50 * approachRef.current
+    }
   })
 
   return (
@@ -137,8 +157,8 @@ export default function Painting({ data }: PaintingProps) {
         <meshStandardMaterial color="#8B7355" roughness={0.3} metalness={0.6} />
       </mesh>
 
-      {/* Painting canvas — probes image, shows placeholder if missing */}
-      <PaintingCanvas data={data} />
+      {/* Painting canvas — only mounts (and fetches texture) once player is within LOD_LOAD_DISTANCE */}
+      {textureShouldLoad ? <PaintingCanvas data={data} /> : <PlaceholderCanvas data={data} />}
 
       {/* ── Label plate below painting ── */}
       <group position={[0, -(data.size[1] / 2 + 0.18), 0.03]}>

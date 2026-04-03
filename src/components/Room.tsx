@@ -223,7 +223,7 @@ export default function Room({
             <MeshReflectorMaterial
               map={reflFloorMap}
               blur={[400, 100]}
-              resolution={1024}
+              resolution={512}
               mixStrength={15}
               roughness={0.7}
               depthScale={1.2}

@@ -178,12 +178,12 @@ export function Candelabra({ position, height = 1.5, color = '#b8962e' }: Candel
   return (
     <group position={position}>
       {/* Base */}
-      <mesh position={[0, 0.05, 0]} castShadow>
+      <mesh position={[0, 0.05, 0]}>
         <cylinderGeometry args={[0.15, 0.18, 0.1, 8]} />
         <meshStandardMaterial color={color} roughness={0.3} metalness={0.6} />
       </mesh>
       {/* Stem */}
-      <mesh position={[0, height / 2, 0]} castShadow>
+      <mesh position={[0, height / 2, 0]}>
         <cylinderGeometry args={[0.03, 0.05, height, 6]} />
         <meshStandardMaterial color={color} roughness={0.3} metalness={0.6} />
       </mesh>
@@ -290,7 +290,7 @@ export function Balustrade({
   for (let i = 0; i <= count; i++) {
     const x = -length / 2 + i * spacing
     balusters.push(
-      <mesh key={i} position={[x, 0.4, 0]} castShadow>
+      <mesh key={i} position={[x, 0.4, 0]}>
         <cylinderGeometry args={[0.03, 0.04, 0.7, 6]} />
         <meshStandardMaterial color={color} roughness={0.6} />
       </mesh>,
@@ -493,7 +493,7 @@ export function Urn({ position, color = '#a09080' }: UrnProps) {
   return (
     <group position={position}>
       {/* Base */}
-      <mesh position={[0, 0.05, 0]} castShadow>
+      <mesh position={[0, 0.05, 0]}>
         <cylinderGeometry args={[0.12, 0.14, 0.1, 8]} />
         <meshStandardMaterial color={color} roughness={0.6} />
       </mesh>
@@ -503,12 +503,12 @@ export function Urn({ position, color = '#a09080' }: UrnProps) {
         <meshStandardMaterial color={color} roughness={0.5} />
       </mesh>
       {/* Neck */}
-      <mesh position={[0, 0.55, 0]} castShadow>
+      <mesh position={[0, 0.55, 0]}>
         <cylinderGeometry args={[0.08, 0.1, 0.1, 8]} />
         <meshStandardMaterial color={color} roughness={0.5} />
       </mesh>
       {/* Rim */}
-      <mesh position={[0, 0.63, 0]} castShadow>
+      <mesh position={[0, 0.63, 0]}>
         <cylinderGeometry args={[0.12, 0.08, 0.06, 8]} />
         <meshStandardMaterial color={color} roughness={0.5} />
       </mesh>

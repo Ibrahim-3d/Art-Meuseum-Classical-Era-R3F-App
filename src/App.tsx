@@ -1,16 +1,16 @@
 import { Suspense, useRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { KeyboardControls, Environment, Lightformer } from '@react-three/drei'
+import { KeyboardControls, Environment, Lightformer, Bvh, AdaptiveDpr } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import {
   EffectComposer,
   Bloom,
   ToneMapping,
   Vignette,
-  SMAA,
+  N8AO,
 } from '@react-three/postprocessing'
 import { BlendFunction, ToneMappingMode } from 'postprocessing'
-import { ACESFilmicToneMapping, SRGBColorSpace, AmbientLight } from 'three'
+import { SRGBColorSpace, AmbientLight } from 'three'
 import { getMaxApproachIntensity } from './lib/approachState'
 
 import Player from './components/Player'
@@ -21,6 +21,7 @@ import HUD from './components/HUD'
 import Minimap from './components/Minimap'
 import DeepZoom from './components/DeepZoom'
 import MusicPlayer from './components/MusicPlayer'
+import LoadingScreen from './components/LoadingScreen'
 
 const keyMap = [
   { name: 'forward', keys: ['KeyW', 'ArrowUp'] },
@@ -55,18 +56,17 @@ export default function App() {
   return (
     <KeyboardControls map={keyMap}>
       <Canvas
+        flat
         shadows
         gl={{
           antialias: false,
-          toneMapping: ACESFilmicToneMapping,
-          toneMappingExposure: 1.0,
           outputColorSpace: SRGBColorSpace,
           powerPreference: 'high-performance',
         }}
         camera={{
           fov: 65,
-          near: 0.1,
-          far: 300,
+          near: 0.5,
+          far: 120,
           position: [0, 1.65, 0],
         }}
         dpr={[1, 1.5]}
@@ -148,17 +148,22 @@ export default function App() {
         <fog attach="fog" args={['#b8c8d8', 40, 180]} />
 
         {/* Physics world */}
-        <Physics gravity={[0, -9.81, 0]}>
-          <Suspense fallback={null}>
-            <Museum />
-            <Exterior />
-          </Suspense>
-          <Player />
-        </Physics>
+        <Bvh firstHitOnly>
+          <Physics gravity={[0, -9.81, 0]}>
+            <Suspense fallback={null}>
+              <Museum />
+              <Exterior />
+            </Suspense>
+            <Player />
+          </Physics>
+        </Bvh>
+
+        {/* Dynamically scales DPR toward [1, 1.5] min when frames are slow */}
+        <AdaptiveDpr />
 
         {/* Post-processing — order matters */}
-        <EffectComposer multisampling={0}>
-          <SMAA />
+        <EffectComposer multisampling={4} enableNormalPass={false}>
+          <N8AO halfRes aoSamples={5} aoRadius={0.4} distanceFalloff={0.75} intensity={1} />
           <Bloom
             intensity={0.3}
             luminanceThreshold={0.9}
@@ -175,6 +180,7 @@ export default function App() {
       </Canvas>
 
       {/* HTML overlay UI */}
+      <LoadingScreen />
       <InfoPanel />
       <HUD />
       <MusicPlayer />

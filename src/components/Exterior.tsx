@@ -6,10 +6,19 @@
  * Terrain must stay completely clear of the building interior.
  */
 
-import { useMemo } from 'react'
+import { useMemo, useEffect, useRef } from 'react'
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
 import { Sky } from '@react-three/drei'
-import { PlaneGeometry, DoubleSide } from 'three'
+import {
+  PlaneGeometry,
+  DoubleSide,
+  Object3D,
+  CylinderGeometry,
+  ConeGeometry,
+  SphereGeometry,
+  MeshStandardMaterial,
+  InstancedMesh,
+} from 'three'
 
 // ── Deterministic pseudo-random generator ────────────────────────────────────
 
@@ -88,38 +97,6 @@ function terrainHeight(x: number, z: number): number {
   const t = dist / RAMP_WIDTH
   const smooth = t * t * (3 - 2 * t)
   return hillHeight * smooth
-}
-
-// ── Simple Tree ──────────────────────────────────────────────────────────────
-
-function SimpleTree({ position, scale }: { position: [number, number, number]; scale: number }) {
-  return (
-    <group position={position} scale={scale}>
-      <mesh position={[0, 1.2, 0]} castShadow>
-        <cylinderGeometry args={[0.08, 0.14, 2.4, 6]} />
-        <meshStandardMaterial color="#5a3a1a" roughness={0.9} />
-      </mesh>
-      <mesh position={[0, 3.2, 0]} castShadow>
-        <coneGeometry args={[1.3, 3.0, 7]} />
-        <meshStandardMaterial color="#2a5a2a" roughness={0.85} />
-      </mesh>
-    </group>
-  )
-}
-
-function RoundTree({ position, scale }: { position: [number, number, number]; scale: number }) {
-  return (
-    <group position={position} scale={scale}>
-      <mesh position={[0, 1.4, 0]} castShadow>
-        <cylinderGeometry args={[0.1, 0.16, 2.8, 6]} />
-        <meshStandardMaterial color="#6a4420" roughness={0.9} />
-      </mesh>
-      <mesh position={[0, 3.6, 0]} castShadow>
-        <sphereGeometry args={[1.6, 8, 6]} />
-        <meshStandardMaterial color="#3a6a3a" roughness={0.8} />
-      </mesh>
-    </group>
-  )
 }
 
 // ── Building Shell ───────────────────────────────────────────────────────────
@@ -265,12 +242,96 @@ function BuildingShell() {
   )
 }
 
+// ── Instanced Trees ──────────────────────────────────────────────────────────
+
+/** Renders all trees using InstancedMesh — 4 draw calls instead of ~500 */
+function InstancedTrees({ trees }: { trees: { pos: [number, number, number]; scale: number; round: boolean }[] }) {
+  const simpleTrees = useMemo(() => trees.filter(t => !t.round), [trees])
+  const roundTrees = useMemo(() => trees.filter(t => t.round), [trees])
+
+  const sTrunkRef = useRef<InstancedMesh>(null)
+  const sFoliageRef = useRef<InstancedMesh>(null)
+  const rTrunkRef = useRef<InstancedMesh>(null)
+  const rFoliageRef = useRef<InstancedMesh>(null)
+
+  // Shared geometries
+  const sTrunkGeo = useMemo(() => new CylinderGeometry(0.08, 0.14, 2.4, 6), [])
+  const sFoliageGeo = useMemo(() => new ConeGeometry(1.3, 3.0, 7), [])
+  const rTrunkGeo = useMemo(() => new CylinderGeometry(0.1, 0.16, 2.8, 6), [])
+  const rFoliageGeo = useMemo(() => new SphereGeometry(1.6, 8, 6), [])
+
+  // Shared materials
+  const sTrunkMat = useMemo(() => new MeshStandardMaterial({ color: '#5a3a1a', roughness: 0.9 }), [])
+  const sFoliageMat = useMemo(() => new MeshStandardMaterial({ color: '#2a5a2a', roughness: 0.85 }), [])
+  const rTrunkMat = useMemo(() => new MeshStandardMaterial({ color: '#6a4420', roughness: 0.9 }), [])
+  const rFoliageMat = useMemo(() => new MeshStandardMaterial({ color: '#3a6a3a', roughness: 0.8 }), [])
+
+  useEffect(() => {
+    const dummy = new Object3D()
+
+    simpleTrees.forEach((t, i) => {
+      dummy.position.set(t.pos[0], t.pos[1] + 1.2 * t.scale, t.pos[2])
+      dummy.scale.setScalar(t.scale)
+      dummy.updateMatrix()
+      sTrunkRef.current?.setMatrixAt(i, dummy.matrix)
+
+      dummy.position.y = t.pos[1] + 3.2 * t.scale
+      dummy.updateMatrix()
+      sFoliageRef.current?.setMatrixAt(i, dummy.matrix)
+    })
+    if (sTrunkRef.current) {
+      sTrunkRef.current.instanceMatrix.needsUpdate = true
+      sTrunkRef.current.computeBoundingSphere()
+    }
+    if (sFoliageRef.current) {
+      sFoliageRef.current.instanceMatrix.needsUpdate = true
+      sFoliageRef.current.computeBoundingSphere()
+    }
+
+    roundTrees.forEach((t, i) => {
+      dummy.position.set(t.pos[0], t.pos[1] + 1.4 * t.scale, t.pos[2])
+      dummy.scale.setScalar(t.scale)
+      dummy.updateMatrix()
+      rTrunkRef.current?.setMatrixAt(i, dummy.matrix)
+
+      dummy.position.y = t.pos[1] + 3.6 * t.scale
+      dummy.updateMatrix()
+      rFoliageRef.current?.setMatrixAt(i, dummy.matrix)
+    })
+    if (rTrunkRef.current) {
+      rTrunkRef.current.instanceMatrix.needsUpdate = true
+      rTrunkRef.current.computeBoundingSphere()
+    }
+    if (rFoliageRef.current) {
+      rFoliageRef.current.instanceMatrix.needsUpdate = true
+      rFoliageRef.current.computeBoundingSphere()
+    }
+  }, [simpleTrees, roundTrees])
+
+  return (
+    <>
+      {simpleTrees.length > 0 && (
+        <>
+          <instancedMesh ref={sTrunkRef} args={[sTrunkGeo, sTrunkMat, simpleTrees.length]} />
+          <instancedMesh ref={sFoliageRef} args={[sFoliageGeo, sFoliageMat, simpleTrees.length]} />
+        </>
+      )}
+      {roundTrees.length > 0 && (
+        <>
+          <instancedMesh ref={rTrunkRef} args={[rTrunkGeo, rTrunkMat, roundTrees.length]} />
+          <instancedMesh ref={rFoliageRef} args={[rFoliageGeo, rFoliageMat, roundTrees.length]} />
+        </>
+      )}
+    </>
+  )
+}
+
 // ── Main Exterior Component ──────────────────────────────────────────────────
 
 export default function Exterior() {
   // Generate displaced terrain geometry
   const terrainGeo = useMemo(() => {
-    const geo = new PlaneGeometry(200, 200, 150, 150)
+    const geo = new PlaneGeometry(200, 200, 100, 100)
     const pos = geo.getAttribute('position')
     if (pos) {
       for (let i = 0; i < pos.count; i++) {
@@ -327,14 +388,8 @@ export default function Exterior() {
       {/* Building shell + foundation */}
       <BuildingShell />
 
-      {/* Trees */}
-      {trees.map((t, i) =>
-        t.round ? (
-          <RoundTree key={i} position={t.pos} scale={t.scale} />
-        ) : (
-          <SimpleTree key={i} position={t.pos} scale={t.scale} />
-        ),
-      )}
+      {/* Trees — instanced (4 draw calls instead of ~500) */}
+      <InstancedTrees trees={trees} />
 
       {/* Ground-level ambient fill for exterior */}
       <hemisphereLight args={['#87CEEB', '#4a7a3a', 0.4]} position={[0, 20, 0]} />
