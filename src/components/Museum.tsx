@@ -1,9 +1,9 @@
-import { useMemo, ReactNode } from 'react'
+import { useMemo, ReactNode, useEffect } from 'react'
 import { SphereGeometry, DoubleSide } from 'three'
 import Room, { TEX } from './Room'
 import Painting from './Painting'
 import MusicStation from './MusicStation'
-import { Text } from '@react-three/drei'
+import { Text, useTexture } from '@react-three/drei'
 import { paintings } from '../data/paintings'
 import { music } from '../data/music'
 import { useMuseum } from '../stores/useMuseum'
@@ -40,6 +40,25 @@ const ROOM_ADJACENCY: Record<RoomId, RoomId[]> = {
   hall1:     ['hall1', 'lobby', 'hall2', 'wingA'],
   hall2:     ['hall2', 'hall1', 'hall3', 'immersive'],
   hall3:     ['hall3', 'hall2', 'atrium'],
+}
+
+/**
+ * Preloads painting textures for all rooms adjacent to the current room.
+ * Runs as a side-effect whenever the player changes rooms so textures are
+ * already in the Three.js loader cache before the player walks through the door.
+ * useTexture.preload() is a static method — safe to call outside render.
+ */
+function TexturePreloader() {
+  const currentRoom = useMuseum((s) => s.currentRoom)
+
+  useEffect(() => {
+    const adjacentRooms = ROOM_ADJACENCY[currentRoom] ?? []
+    paintings
+      .filter((p) => adjacentRooms.includes(p.room))
+      .forEach((p) => useTexture.preload(p.image))
+  }, [currentRoom])
+
+  return null
 }
 
 /** Hides a room's rendering when the player is far away. Physics colliders stay active. */
@@ -136,6 +155,7 @@ function DoorSign({ position, rotation = [0, 0, 0], text, subtitle }: {
 export default function Museum() {
   return (
     <group>
+      <TexturePreloader />
       {/* ════════════════════════════════════════════════════════════════════
           LEFT COLUMN — Painting Wings (12w × 16d × 6h, center x=-13)
           ════════════════════════════════════════════════════════════════════ */}

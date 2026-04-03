@@ -17,14 +17,12 @@ interface PaintingProps {
   data: PaintingData
 }
 
-type LoadState = 'checking' | 'ready' | 'failed'
-
 // Reusable vector to avoid per-frame allocation
 const _paintingPos = new Vector3()
 
-// Load textures only when player enters this radius — defers all 14 texture
-// fetches until the painting is actually reachable, saving initial VRAM + load time
-const LOD_LOAD_DISTANCE = 20
+// Start loading a texture at this distance — large enough to preload while the
+// player is still in the previous room, before GPU stutter can affect gameplay
+const LOD_LOAD_DISTANCE = 30
 
 function handleClick(data: PaintingData) {
   return (e: ThreeEvent<MouseEvent>) => {
@@ -54,21 +52,8 @@ function TexturedCanvas({ data }: PaintingProps) {
   )
 }
 
-/** Probes the image URL first, only mounts TexturedCanvas if it exists */
+/** Wraps TexturedCanvas in Suspense — no probe needed since useTexture handles errors via Suspense */
 function PaintingCanvas({ data }: PaintingProps) {
-  const [loadState, setLoadState] = useState<LoadState>('checking')
-
-  useEffect(() => {
-    const img = new Image()
-    img.onload = () => setLoadState('ready')
-    img.onerror = () => setLoadState('failed')
-    img.src = data.image
-  }, [data.image])
-
-  if (loadState !== 'ready') {
-    return <PlaceholderCanvas data={data} />
-  }
-
   return (
     <Suspense fallback={<PlaceholderCanvas data={data} />}>
       <TexturedCanvas data={data} />
@@ -110,10 +95,13 @@ export default function Painting({ data }: PaintingProps) {
     _paintingPos.set(data.position[0], data.position[1], data.position[2])
     const dist = camera.position.distanceTo(_paintingPos)
 
-    // Trigger texture load once when player enters LOD radius
+    // Trigger texture load once when player enters LOD radius.
+    // Stagger by remaining distance so closer paintings mount first and
+    // GPU texture uploads are spread over ~300ms rather than one spike frame.
     if (!isInRangeRef.current && dist < LOD_LOAD_DISTANCE) {
       isInRangeRef.current = true
-      setTextureShouldLoad(true)
+      const staggerMs = Math.max(0, (dist - APPROACH_OUTER) * 15)
+      setTimeout(() => setTextureShouldLoad(true), staggerMs)
     }
 
     // Only activate when player is on the viewing side (in front, not behind wall)
