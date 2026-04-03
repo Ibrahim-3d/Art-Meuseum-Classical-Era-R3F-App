@@ -144,8 +144,8 @@ export default function App() {
           shadow-camera-far={80}
         />
 
-        {/* Fog — lighter for indoor/outdoor, pushed back for exterior views */}
-        <fog attach="fog" args={['#b8c8d8', 40, 180]} />
+        {/* Fog — far end aligned with camera.far=120 so objects fade before hard clip */}
+        <fog attach="fog" args={['#b8c8d8', 40, 115]} />
 
         {/* Physics world */}
         <Bvh firstHitOnly>

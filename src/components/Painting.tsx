@@ -196,13 +196,14 @@ export default function Painting({ data }: PaintingProps) {
       {/* Spotlight target */}
       <object3D ref={targetRef} position={[0, 0, 0]} />
 
-      {/* Spotlight above and in front */}
+      {/* Spotlight — starts hidden/zero so useFrame controls it from frame 1 */}
       <spotLight
         ref={lightRef}
         position={[0, 1.5, 1]}
         angle={0.4}
         penumbra={0.8}
-        intensity={50}
+        intensity={0}
+        visible={false}
         color="#fff5e0"
       />
     </group>

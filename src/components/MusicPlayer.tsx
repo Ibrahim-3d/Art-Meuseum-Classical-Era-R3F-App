@@ -216,7 +216,7 @@ export default function MusicPlayer() {
     const startNewTrack = () => {
       const audio = new Audio()
       audio.crossOrigin = 'anonymous' // required for Web Audio API with Vite dev server
-      audio.preload = 'none'          // no eager buffering — download starts only on play()
+      audio.preload = 'metadata'      // fetch only duration (for progress bar); audio data streams on play()
       audio.loop = true
       audio.volume = 0
       audio.muted = isMuted

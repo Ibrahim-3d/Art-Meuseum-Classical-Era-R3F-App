@@ -265,7 +265,7 @@ export default function Museum() {
 
       {/* All paintings — culled per room visibility */}
       {paintings.map((p) => (
-        <VisibleRoom key={p.id} roomId={p.room as RoomId}>
+        <VisibleRoom key={p.id} roomId={p.room}>
           <Painting data={p} />
         </VisibleRoom>
       ))}

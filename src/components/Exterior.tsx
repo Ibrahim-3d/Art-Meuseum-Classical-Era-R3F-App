@@ -281,11 +281,13 @@ function InstancedTrees({ trees }: { trees: { pos: [number, number, number]; sca
     })
     if (sTrunkRef.current) {
       sTrunkRef.current.instanceMatrix.needsUpdate = true
-      sTrunkRef.current.computeBoundingSphere()
+      // Disable frustum culling — computeBoundingSphere() only covers origin geometry,
+      // causing the entire forest to disappear when the camera looks away from world origin
+      sTrunkRef.current.frustumCulled = false
     }
     if (sFoliageRef.current) {
       sFoliageRef.current.instanceMatrix.needsUpdate = true
-      sFoliageRef.current.computeBoundingSphere()
+      sFoliageRef.current.frustumCulled = false
     }
 
     roundTrees.forEach((t, i) => {
@@ -300,26 +302,34 @@ function InstancedTrees({ trees }: { trees: { pos: [number, number, number]; sca
     })
     if (rTrunkRef.current) {
       rTrunkRef.current.instanceMatrix.needsUpdate = true
-      rTrunkRef.current.computeBoundingSphere()
+      rTrunkRef.current.frustumCulled = false
     }
     if (rFoliageRef.current) {
       rFoliageRef.current.instanceMatrix.needsUpdate = true
-      rFoliageRef.current.computeBoundingSphere()
+      rFoliageRef.current.frustumCulled = false
     }
-  }, [simpleTrees, roundTrees])
+
+    // Dispose manually-created resources when instances change
+    return () => {
+      sTrunkGeo.dispose(); sFoliageGeo.dispose()
+      rTrunkGeo.dispose(); rFoliageGeo.dispose()
+      sTrunkMat.dispose(); sFoliageMat.dispose()
+      rTrunkMat.dispose(); rFoliageMat.dispose()
+    }
+  }, [simpleTrees, roundTrees, sTrunkGeo, sFoliageGeo, rTrunkGeo, rFoliageGeo, sTrunkMat, sFoliageMat, rTrunkMat, rFoliageMat])
 
   return (
     <>
       {simpleTrees.length > 0 && (
         <>
-          <instancedMesh ref={sTrunkRef} args={[sTrunkGeo, sTrunkMat, simpleTrees.length]} />
-          <instancedMesh ref={sFoliageRef} args={[sFoliageGeo, sFoliageMat, simpleTrees.length]} />
+          <instancedMesh ref={sTrunkRef} args={[sTrunkGeo, sTrunkMat, simpleTrees.length]} castShadow />
+          <instancedMesh ref={sFoliageRef} args={[sFoliageGeo, sFoliageMat, simpleTrees.length]} castShadow />
         </>
       )}
       {roundTrees.length > 0 && (
         <>
-          <instancedMesh ref={rTrunkRef} args={[rTrunkGeo, rTrunkMat, roundTrees.length]} />
-          <instancedMesh ref={rFoliageRef} args={[rFoliageGeo, rFoliageMat, roundTrees.length]} />
+          <instancedMesh ref={rTrunkRef} args={[rTrunkGeo, rTrunkMat, roundTrees.length]} castShadow />
+          <instancedMesh ref={rFoliageRef} args={[rFoliageGeo, rFoliageMat, roundTrees.length]} castShadow />
         </>
       )}
     </>

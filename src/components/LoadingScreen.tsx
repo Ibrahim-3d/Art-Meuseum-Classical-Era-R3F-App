@@ -6,12 +6,14 @@ export default function LoadingScreen() {
   // Keep the overlay mounted until fade-out animation completes
   const [show, setShow] = useState(true)
 
+  // Hide when loading settles: either all assets loaded (progress≥100) OR
+  // R3F reports no active loading (guards against progress never reaching 100)
   useEffect(() => {
-    if (!active && progress >= 100) {
+    if (!active) {
       const timer = setTimeout(() => setShow(false), 900)
       return () => clearTimeout(timer)
     }
-  }, [active, progress])
+  }, [active])
 
   if (!show) return null
 
@@ -71,7 +73,7 @@ export default function LoadingScreen() {
         <div
           style={{
             height: '100%',
-            width: `${progress}%`,
+            width: `${Math.min(100, Math.max(0, progress))}%`,
             background: '#f5e6c8',
             borderRadius: 1,
             transition: 'width 0.25s ease',
