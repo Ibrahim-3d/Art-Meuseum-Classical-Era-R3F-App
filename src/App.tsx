@@ -57,7 +57,6 @@ export default function App() {
     <KeyboardControls map={keyMap}>
       <Canvas
         flat
-        shadows
         gl={{
           antialias: false,
           outputColorSpace: SRGBColorSpace,
@@ -132,16 +131,11 @@ export default function App() {
         {/* Dimmable ambient light — darkens when approaching paintings */}
         <DimmableAmbientLight />
 
+        {/* No castShadow — indoor museum walls block outdoor light so the shadow map
+            pass was a full 1024×1024 scene render wasted every frame */}
         <directionalLight
           position={[0, 10, -15]}
           intensity={1.5}
-          castShadow
-          shadow-mapSize={[1024, 1024]}
-          shadow-camera-left={-30}
-          shadow-camera-right={30}
-          shadow-camera-top={30}
-          shadow-camera-bottom={-50}
-          shadow-camera-far={80}
         />
 
         {/* Fog — far end aligned with camera.far=120 so objects fade before hard clip */}
@@ -149,7 +143,7 @@ export default function App() {
 
         {/* Physics world */}
         <Bvh firstHitOnly>
-          <Physics gravity={[0, -9.81, 0]}>
+          <Physics gravity={[0, -9.81, 0]} timeStep={1 / 30}>
             <Suspense fallback={null}>
               <Museum />
               <Exterior />
@@ -163,7 +157,7 @@ export default function App() {
 
         {/* Post-processing — order matters */}
         <EffectComposer multisampling={4} enableNormalPass={false}>
-          <N8AO halfRes aoSamples={5} aoRadius={0.4} distanceFalloff={0.75} intensity={1} />
+          <N8AO halfRes aoSamples={3} aoRadius={0.3} distanceFalloff={1} intensity={0.8} />
           <Bloom
             intensity={0.3}
             luminanceThreshold={0.9}
