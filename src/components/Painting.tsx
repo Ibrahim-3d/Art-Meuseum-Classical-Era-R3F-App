@@ -74,6 +74,7 @@ export default function Painting({ data }: PaintingProps) {
   // Never resets to false so the texture isn't unloaded when the player walks away.
   const isInRangeRef = useRef(false)
   const [textureShouldLoad, setTextureShouldLoad] = useState(false)
+  const lodTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (lightRef.current && targetRef.current) {
@@ -82,14 +83,30 @@ export default function Painting({ data }: PaintingProps) {
     }
   }, [])
 
-  // Cleanup approach state on unmount
+  // Cleanup approach state and pending stagger timer on unmount
   useEffect(() => {
-    return () => setApproachIntensity(data.id, 0)
+    return () => {
+      setApproachIntensity(data.id, 0)
+      if (lodTimerRef.current !== null) clearTimeout(lodTimerRef.current)
+    }
   }, [data.id])
 
   useFrame(() => {
     const group = groupRef.current
     if (!group) return
+
+    // VisibleRoom sets group.parent.visible=false for hidden rooms.
+    // Bail out early to avoid 14×60fps distance/lerp/scale work on invisible paintings.
+    if (!group.parent?.visible) {
+      // Reset state cleanly so re-entering the room starts fresh
+      if (approachRef.current > 0.001) {
+        approachRef.current = 0
+        setApproachIntensity(data.id, 0)
+        group.scale.setScalar(1)
+        if (lightRef.current) lightRef.current.visible = false
+      }
+      return
+    }
 
     // Calculate distance from camera to painting center
     _paintingPos.set(data.position[0], data.position[1], data.position[2])
@@ -101,7 +118,7 @@ export default function Painting({ data }: PaintingProps) {
     if (!isInRangeRef.current && dist < LOD_LOAD_DISTANCE) {
       isInRangeRef.current = true
       const staggerMs = Math.max(0, (dist - APPROACH_OUTER) * 15)
-      setTimeout(() => setTextureShouldLoad(true), staggerMs)
+      lodTimerRef.current = setTimeout(() => setTextureShouldLoad(true), staggerMs)
     }
 
     // Only activate when player is on the viewing side (in front, not behind wall)

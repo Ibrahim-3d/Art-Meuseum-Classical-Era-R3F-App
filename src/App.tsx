@@ -136,7 +136,7 @@ export default function App() {
           position={[0, 10, -15]}
           intensity={1.5}
           castShadow
-          shadow-mapSize={[2048, 2048]}
+          shadow-mapSize={[1024, 1024]}
           shadow-camera-left={-30}
           shadow-camera-right={30}
           shadow-camera-top={30}
